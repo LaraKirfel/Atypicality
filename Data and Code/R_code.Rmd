@@ -1,0 +1,2045 @@
+
+---
+  title: "Epistemic States and Statistical Normality in Causal Judgments"
+author: "Lara Kirfel & David Lagnado"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  bookdown::html_document2:
+  toc: true
+toc_depth: 4
+theme: cosmo
+highlight: tango
+---
+
+
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  comment = "",
+  results = "hold",
+  fig.show = "hold")
+```
+
+# Install packages
+
+```{r, message=FALSE}
+install.packages("reshape")
+install.packages("janitor")
+install.packages("DT")
+install.packages("Hmisc")
+install.packages("broom")
+install.packages("tidyverse")
+install.packages("MuMIn")
+install.packages("pwr") ####?
+install.packages("simr")
+install.packages("Publish")
+install.packages("ggpubr")
+
+```
+
+```{r, message=FALSE}
+library("reshape") # variety of methods for reshaping data prior 
+library("janitor") # for cleaning variable names 
+library("DT") # for nice tables
+library("Hmisc") # for smean function for bootstrapped confidence intervals 
+library("tidyverse") # for data wrangling, visualization, etc. 
+library("lme4") # for fitting and analyzing mixed models
+library("MuMIn") # for calculating effect sizes
+library("pwr") #for power analysis 
+library("simr") # for power analysis 
+library("ggpubr") # for publication Ready Plots
+
+```
+
+```{r}
+# set ggplot theme 
+theme_set(
+  theme_classic()
+)
+```
+
+## Experiment 1: Statistical Abnormality and Knowledge
+
+```{r}
+###Experiment 1
+#### Read in Data
+df.data1 = read.csv(file = "Exp_1.csv", stringsAsFactors = F, sep = ",") %>% 
+  filter(row_number() > 2) %>% # additional rows in qualtrics csv
+  clean_names() %>% 
+  filter(!condition =="", #exclude bot fails,
+         progress ==100| progress==99)
+```
+
+
+## Experiment 1: Data Editing
+
+```{r}
+###Experiment 1: 
+#####Data Editing
+
+df.exp1 = df.data1 %>% 
+  mutate(participant = 1:n()) %>% 
+  rename(order=question_order) %>%
+  rename(duration=duration_in_seconds) %>% 
+  mutate(duration=as.numeric(duration)) %>% 
+  select(m_both_office:k_both_ep_a2_2_1,
+         participant,
+         order,
+         condition,
+         age,
+         gender,
+         duration,
+         -starts_with("q")) %>% 
+  gather("index", "value", -c(participant, condition, order, age, gender, duration))%>% 
+  filter(value != "") %>%
+  arrange(index)%>%
+  mutate(index = ifelse(str_detect(index,"one_a1"),
+                        "one_cause_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_a2"),
+                        "one_cause_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "both_a1"),
+                        "both_cause_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_a2"),
+                        "both_cause_a2",
+                        index)) %>% 
+  mutate(index = ifelse(str_detect(index, "one_office"),
+                        "one_check_office",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_know"),
+                        "one_check_know",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_day"),
+                        "one_check_day",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_struc"),
+                        "one_check_struc",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_freq"),
+                        "one_check_freq",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_office"),
+                        "both_check_office",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_know"),
+                        "both_check_know",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_day"),
+                        "both_check_day",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_struc"),
+                        "both_check_struc",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_freq"),
+                        "both_check_freq",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_ep_a1"),
+                        "one_expectation_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_ep_a2"),
+                        "one_expectation_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "both_ep_a1"),
+                        "both_expectation_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_ep_a2"),
+                        "both_expectation_a2",
+                        index))%>%
+  mutate(order = ifelse(order == 1,"agent 1 first", 
+                          ifelse(order == 2, "agent 2 first", " ")))%>%
+  mutate(scenario = ifelse((condition == 1| condition== 2), "Microwave", "Kettle"))%>%
+  mutate(scenario_order = ifelse((condition == 1| condition== 3), "Both first", "One first"))%>%
+  spread(index, value) %>%
+  arrange(participant)
+
+```
+
+### Filter setting
+```{r}
+####Experiment 1: Create filter
+df.exp1<- df.exp1 %>%  
+  mutate(check_total=if_else(both_check_know=="1", 1, 0)) %>% 
+  mutate(check_total=if_else(both_check_office =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(both_check_day =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(both_check_struc=="2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(both_check_freq=="1,2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_know =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_office =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_day =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_struc =="2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_freq =="1", check_total+1, check_total))
+           
+#### Set filter
+df.exp1<-df.exp1 %>% 
+  filter(check_total >=5) ####Set to 10 to change exlusion criterion to "all check questions correct"
+```
+
+### Demographics
+```{r}
+####Experiment 1
+###Demographics
+
+df.exp1_demo <- df.exp1 %>% 
+  select(age, gender, duration) %>% 
+  mutate(age=as.numeric(age)) %>%
+  transform(gender= ifelse(gender==1, "Male", #recode numbers into gender categories
+                    ifelse(gender==2, "Female",
+                    ifelse(gender==3, "Prefer not to say", gender)))) %>% 
+  filter(age<100 |age ==" ") %>% #remove outliers (year) or N.A.s
+  summarize(n=n(),
+             female=sum(gender=="Female"),
+             not_say=sum(gender=="Prefer not to say"),
+             mean_age = mean(age),
+             std_age=sd(age),
+             mean_time=mean(duration/60),
+             sd_time=sd(duration/60)
+            )
+```
+
+
+### Create dataframe for analysis
+```{r}
+#####Experiment 1
+###create data frame in long format with causal and expectation responses
+
+df.exp1_long = df.exp1 %>% 
+  select(scenario,
+         scenario_order,
+         participant,
+         check_total,
+         contains("cause"),
+         contains("expect")) %>% 
+  gather(condition, rating, "both_cause_a1":"one_expectation_a2") %>%  
+  mutate(type=ifelse(str_detect(condition, "cause"), "cause_rating", "expect_rating")) %>% 
+  mutate(frequency = ifelse(str_detect(condition, "one"),
+                        "Agent 2 infrequent", "Both agents frequent")) %>% 
+  mutate(agent = ifelse(str_detect(condition, "_a1"),
+                        "agent 1", "agent 2")) %>% 
+  select(-condition) %>% 
+  spread(type, rating) %>% 
+  mutate(cause_rating=as.numeric(cause_rating)) %>% 
+  mutate(expect_rating=as.numeric(expect_rating))
+
+```
+
+
+### Data analysis
+# Causal Judgment
+```{r}
+######Experiment 1: Causal Rating
+
+
+C1_m1 <- lmer(cause_rating ~ agent +(1|participant), df.exp1_long, REML=F)
+C1_m2 <- lmer(cause_rating ~ frequency +(1|participant), df.exp1_long, REML=F)
+C1_m3 <- lmer(cause_rating ~ agent + frequency + (1|participant), df.exp1_long, REML=F)
+C1_m4 <- lmer(cause_rating ~ agent*frequency +(1|participant), df.exp1_long, REML=F)
+C1_m5 <- lmer(cause_rating ~ frequency*agent*scenario +(1|participant), df.exp1_long, REML=F)
+
+##Effect of frequency
+anova(C1_m1,C1_m3)
+r.squaredGLMM(C1_m2) #effect size for full model
+r.squaredGLMM(C1_m3)[2] - r.squaredGLMM(C1_m1)[2] #effect size for factor only
+
+##Effect of agent
+anova(C1_m2,C1_m3)
+r.squaredGLMM(C1_m1) #effect size for full model
+r.squaredGLMM(C1_m3)[2] - r.squaredGLMM(C1_m2)[2] #effect size for factor only
+
+##Interaction of frequency and agent
+anova(C1_m3,C1_m4)
+r.squaredGLMM(C1_m4)#effect size for full model
+r.squaredGLMM(C1_m4)[2] - r.squaredGLMM(C1_m3)[2]  #effect size for factor only
+
+##Three way interaction with scenario
+anova(C1_m4,C1_m5)
+r.squaredGLMM(C1_m5)#effect size for full model
+r.squaredGLMM(C1_m5)[2] - r.squaredGLMM(C1_m4)[2]#effect size for factor only
+
+##Test for agents in 'both frequent' condition
+C1_t1 <- lmer(cause_rating ~ (1|participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
+C1_t2 <- lmer(cause_rating ~ agent + (1 | participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
+anova(C1_t1,C1_t2)
+
+##Test for agents in 'one frequent' condition
+C1_t3 <- lmer(cause_rating ~ (1|participant), data=df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",])
+C1_t4 <- lmer(cause_rating ~ agent + (1|participant), df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",])
+anova(C1_t3,C1_t4)
+
+###Observed Power analysis
+powerSim(C1_m5,fixed("agentagent 2", "z"), alpha=0.045, nsim = 50) #Effect "agent"
+powerSim(C1_m5,fixed("frequencyBoth agents frequent", "z"), alpha=0.045, nsim = 50) # Effect "Frequency""
+powerSim(C1_m5,fixed("frequencyBoth agents frequent:agentagent 2", "z"), alpha=0.045, nsim = 50) #Interaction "Frequency x Agent"" 
+
+###Overall analysis
+lmerTest::lmer(cause_rating ~ frequency*agent*scenario + (1 | participant), df.exp1_long)%>% summary()
+
+```
+
+# Expectation Judgment
+```{r}
+#######Experiment 1: Expectation Rating
+
+E1_m1 <- lmer(expect_rating ~ agent +(1|participant), df.exp1_long, REML=F)
+E1_m2 <- lmer(expect_rating ~ frequency +(1|participant), df.exp1_long, REML=F)
+E1_m3 <- lmer(expect_rating ~ agent + frequency + (1|participant), df.exp1_long, REML=F)
+E1_m4 <- lmer(expect_rating ~ agent*frequency +(1|participant), df.exp1_long, REML=F)
+E1_m5 <- lmer(expect_rating ~ frequency*agent*scenario +(1|participant), df.exp1_long, REML=F)
+
+##Effect of agency
+anova(E1_m2,E1_m3)
+r.squaredGLMM(E1_m1) #effect size for full model
+r.squaredGLMM(E1_m3)[2] - r.squaredGLMM(E1_m2)[2] #effect size for factor only
+
+##Effect of frequency
+anova(E1_m1,E1_m3)
+r.squaredGLMM(E1_m2)
+r.squaredGLMM(E1_m3)[2] - r.squaredGLMM(E1_m1)[2]
+
+
+##Interaction of frequency and agent
+anova(E1_m3,E1_m4)
+r.squaredGLMM(E1_m4)
+r.squaredGLMM(E1_m4)[2] - r.squaredGLMM(E1_m3)[2]
+
+
+##Interaction scenario x frequency x agent
+anova(E1_m4,E1_m5)
+r.squaredGLMM(E1_m5)
+r.squaredGLMM(E1_m5)[2] - r.squaredGLMM(E1_m4)[2]
+
+
+##Test for `agent' in 'both frequent' condition
+E1_t1 <- lmer(expect_rating ~ (1|participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
+E1_t2 <- lmer(expect_rating ~ agent + (1 | participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
+anova(E1_t1,E1_t2)
+
+##Test for `agent' in 'one frequent' condition
+E1_t3 <- lmer(expect_rating ~ (1|participant), data=df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",], REML=F)
+E1_t4 <- lmer(expect_rating ~ agent + (1|participant), df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",], REML=F)
+anova(E1_t3,E1_t4)
+
+##Test for scenario interaction with frequency for fixed agent (`normal agent')
+E1_t5 <- lmer(expect_rating ~ frequency+
+              (1|participant), 
+               df.exp1_long[df.exp1_long$agent=="agent 1",], REML=F)
+
+E1_t6 <- lmer(expect_rating ~ frequency*scenario+
+               (1|participant), 
+               df.exp1_long[df.exp1_long$agent=="agent 1",], REML=F)
+anova(E1_t5,E1_t6)
+
+
+#####Power Analysis
+powerSim(E1_m5,fixed("agentagent 2", "z"), alpha=0.045, nsim = 50) #Effect "agent"
+powerSim(E1_m5,fixed("frequencyBoth agents frequent", "z"), alpha=0.045, nsim = 50) # Effect "Frequency""
+powerSim(E1_m5,fixed("frequencyBoth agents frequent:agentagent 2", "z"), alpha=0.045, nsim = 50) #Interaction "Frequency x Agent"
+
+###Overall analysis
+lmerTest::lmer(expect_rating ~ frequency*agent*scenario + (1 | participant), df.exp1_long)%>% summary()
+
+```
+
+###Descriptives
+
+```{r}
+### Experiment 1
+##### Descriptives
+
+#Summary across scenario
+df.exp1_desc<- df.exp1_long%>%
+  group_by(frequency, agent) %>%
+  summarise(c_mean = mean(cause_rating),#causal rating
+            c_sd   = sd(cause_rating), 
+            c_se   = c_sd / sqrt(n()), 
+            c_upper_ci = c_mean+c_se*1.96, 
+            c_lower_ci = c_mean-c_se*1.96, 
+            e_mean = mean(expect_rating), #epistemic rating
+            e_sd   = sd(expect_rating), 
+            e_se   = e_sd / sqrt(n()),
+            e_upper_ci = e_mean+e_se*1.96, 
+            e_lower_ci = e_mean-e_se*1.96) 
+
+#Summary by scenario
+df.exp1_desc2<- df.exp1_long%>%
+  group_by(frequency, agent, scenario) %>%
+  summarise(c_mean = mean(cause_rating),#causal rating
+            c_sd   = sd(cause_rating), #causal rating
+            c_se   = c_sd / sqrt(n()), #causal rating
+            c_upper_ci = c_mean+c_se*1.96, 
+            c_lower_ci = c_mean-c_se*1.96, 
+            e_mean = mean(expect_rating), #epistemic rating
+            e_sd   = sd(expect_rating), #epistemic rating
+            e_se   = e_sd / sqrt(n()),
+            e_upper_ci = e_mean+e_se*1.96, 
+            e_lower_ci = e_mean-e_se*1.96) #epistemic rating
+
+#### Combine both Descriptive tables in one dataframe
+df.exp1_desc <- rbind(df.exp1_desc, df.exp1_desc2)
+rm(df.exp1_desc2)
+```
+
+###Plot
+# Causal Judgment
+```{r}
+### Experiment 1
+#### Causal Judgment Plot
+
+#Set theme
+myTheme <-   theme(axis.title.x  = element_blank(), 
+                   axis.title.y = element_text(color="black", size = 18, vjust=.9), 
+                   axis.text.x = element_text(color="black", size = 18),
+                   axis.text.y = element_text(color="black", size = 18), 
+                   strip.text.x = element_text(color="black", size = 18),
+                   legend.text = element_text(color="black", size = 18),
+                   legend.title = element_text(color="black", size = 18),
+                   legend.position = "top",
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   strip.background = element_rect(fill="white"))
+
+#set colour palettes    
+cPalette <- c("#333300", "#CCCC99")
+ePalette<- c("#969696", "#f7f7f7")
+ecPalette<-c("gray13", "khaki4")
+level_order <- c('Both agents frequent', 'Agent 2 infrequent')
+
+#######
+
+# Causal Judgment Plot
+
+Fig1a <- ggplot(df.exp1_long, aes(x=factor(frequency, levels=level_order), cause_rating, fill=agent)) +
+  coord_cartesian(ylim = c(1,7.5)) +
+  scale_y_continuous(breaks = seq(0, 7, by=1))+
+  scale_x_discrete(labels=c("Both Agents frequent", "Agent 2 infrequent")) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.5) +
+  stat_summary( fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
+  geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.15), alpha = 
+  0.08, colour="black")+
+  scale_fill_manual(values=cPalette,  name='Agent', labels=c("Agent 1", "Agent 2"))+
+  labs( y="Causal Agreement Rating")+
+  #facet_grid(~scenario, scales="free_x")+
+  theme_bw()+
+  myTheme
+
+#Show plot
+plot(Fig1a)
+
+# Save plot
+ggsave(Fig1a, file="Fig1a.pdf", dpi=400, height = 6, width = 8)
+
+```
+
+### Plot
+# Expectation Judgment
+```{r}
+### Experiment 1
+#### Expectation Judgment
+
+Fig1b <- ggplot(df.exp1_long, aes(x=factor(frequency, levels=level_order), expect_rating, fill=agent)) +
+  coord_cartesian(ylim = c(1,7.5)) +
+  scale_y_continuous(breaks = seq(1, 7, by=1))+
+  scale_x_discrete(labels=c("Both Agents frequent", "Agent 2 infrequent")) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
+  geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.15),  alpha =  0.08, colour= "black" )+
+  scale_fill_manual(values=ePalette,  name='Agent', labels=c("Agent 1", "Agent 2"))+
+  labs( y="Expectation Agreement Rating")+
+  #facet_grid(~scenario, scales="free_x")+
+  theme_bw()+
+  myTheme
+
+#Show plot
+plot(Fig1b)
+
+#Save plot
+ggsave(Fig1b, file="Fig1b.pdf", dpi=400, height = 6, width = 8)
+```
+
+
+### Experiment 2
+## Read in Data
+
+```{r}
+###Experiment 2
+#### Read in Data
+
+df.data2 = read.csv(file = "Exp_2.csv", stringsAsFactors = F, sep = ",") %>% 
+  filter(row_number() > 2) %>% # additional rows in qualtrics csv
+  clean_names() %>% 
+  filter(!condition =="", #exclude bot fails,
+         progress ==100| progress==99)
+```
+
+## Structure and edit data
+
+```{r}
+###Experimet 2
+#### Data Editing
+
+df.exp2 = df.data2 %>% 
+  mutate(participant = 1:n()) %>% 
+  rename(order=question_order) %>%
+  rename(duration=duration_in_seconds) %>% 
+  mutate(duration=as.numeric(duration)) %>% 
+  select(m_both_office:k_both_ep_a2_2_1,
+         participant,
+         order,
+         condition,
+         age,
+         gender,
+         duration,
+         -starts_with("q")) %>% 
+  gather("index", "value", -c(participant, condition, order, age, gender, duration))%>% 
+  filter(value != "") %>%
+  arrange(index)%>%
+  mutate(index = ifelse(str_detect(index,"one_a1"),
+                        "one_cause_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_a2"),
+                        "one_cause_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "both_a1"),
+                        "both_cause_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_a2"),
+                        "both_cause_a2",
+                        index)) %>% 
+  mutate(index = ifelse(str_detect(index, "one_office"),
+                        "one_check_office",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_know"),
+                        "one_check_know",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_day"),
+                        "one_check_day",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_struc"),
+                        "one_check_struc",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_freq"),
+                        "one_check_freq",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_office"),
+                        "both_check_office",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_know"),
+                        "both_check_know",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_day"),
+                        "both_check_day",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_struc"),
+                        "both_check_struc",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_freq"),
+                        "both_check_freq",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_ep_a1"),
+                        "one_expectation_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_ep_a2"),
+                        "one_expectation_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "both_ep_a1"),
+                        "both_expectation_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "both_ep_a2"),
+                        "both_expectation_a2",
+                        index))%>%
+  mutate(order = ifelse(order == 1,"agent 1 first", 
+                          ifelse(order == 2, "agent 2 first", " ")))%>%
+  mutate(scenario = ifelse((condition == 1| condition== 2), "Microwave", "Kettle"))%>%
+  mutate(scenario_order = ifelse((condition == 1| condition== 3), "Both first", "One first"))%>%
+  spread(index, value) %>%
+  arrange(participant)
+
+```
+
+### Set filter
+```{r}
+###Experiment 2
+
+#### Create filter
+df.exp2<- df.exp2 %>%  
+  mutate(check_total=if_else(both_check_know=="2", 1, 0)) %>% 
+  mutate(check_total=if_else(both_check_office =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(both_check_day =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(both_check_struc=="2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(both_check_freq=="1,2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_know =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_office =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_day =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_struc =="2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_freq =="1", check_total+1, check_total))
+       
+# Set filter    
+df.exp2<-df.exp2 %>% 
+  filter(check_total >=5) #Set to 10 to change exlusion criterion to "all check questions correct"
+```
+
+### Demographics
+```{r}
+###Experiment 2
+#####Demographics
+
+df.exp2_demo <- df.exp2 %>% 
+  select(age, gender, duration) %>% 
+  mutate(age=as.numeric(age)) %>%
+  transform(gender= ifelse(gender==1, "Male", #recode numbers into gender categories
+                    ifelse(gender==2, "Female",
+                    ifelse(gender==3, "Prefer not to say", gender)))) %>% 
+  filter(age<100 |age ==" ") %>% #remove outliers (year) or N.A.s
+  summarize(n=n(),
+             female=sum(gender=="Female"),
+             not_say=sum(gender=="Prefer not to say"),
+             mean_age = mean(age),
+             std_age=sd(age),
+             mean_time=mean(duration/60),
+             sd_time=sd(duration/60)
+            )
+```
+
+### Create dataframe for analysis
+```{r}
+###Experiment 2
+###create data frame in long format with causal and expectation responses
+df.exp2_long = df.exp2 %>% 
+  select(scenario,
+         scenario_order,
+         participant,
+         check_total,
+         contains("cause"),
+         contains("expect")) %>% 
+  gather(condition, rating, "both_cause_a1":"one_expectation_a2") %>%  
+  mutate(type=ifelse(str_detect(condition, "cause"), "cause_rating", "expect_rating")) %>% 
+  mutate(frequency = ifelse(str_detect(condition, "one"),
+                        "Agent 2 infrequent", "Both agents frequent")) %>% 
+  mutate(agent = ifelse(str_detect(condition, "_a1"),
+                        "agent 1", "agent 2")) %>% 
+  select(-condition) %>% 
+  spread(type, rating) %>% 
+  mutate(cause_rating=as.numeric(cause_rating)) %>% 
+  mutate(expect_rating=as.numeric(expect_rating))
+
+```
+
+### Data analysis
+# Causal Judgment
+```{r}
+#Experiment 2: Causal Rating
+
+C2_m1 <- lmer(cause_rating ~ frequency +(1|participant), df.exp2_long, REML=F)
+C2_m2 <- lmer(cause_rating ~ agent +(1|participant), df.exp2_long, REML=F)
+C2_m3 <- lmer(cause_rating ~ agent + frequency +(1|participant), df.exp2_long, REML=F)
+C2_m4 <- lmer(cause_rating ~ agent*frequency +(1|participant), df.exp2_long, REML=F)
+C2_m5 <- lmer(cause_rating ~ frequency*agent*scenario +(1|participant), df.exp2_long, REML=F)
+
+##Effect of agent
+anova(C2_m1,C2_m3)
+r.squaredGLMM(C2_m2)
+r.squaredGLMM(C2_m3)[2] - r.squaredGLMM(C2_m1)[2]
+
+##Effect of frequency
+anova(C2_m2,C2_m3)
+r.squaredGLMM(C2_m1)
+r.squaredGLMM(C2_m3)[2] - r.squaredGLMM(C2_m2)[2]
+
+##Interaction of frequency and agent
+anova(C2_m3,C2_m4)
+r.squaredGLMM(C2_m2)
+r.squaredGLMM(C2_m3)[2] - r.squaredGLMM(C2_m1)[2]
+
+##Three way interaction scenario x frequency x agent
+anova(C2_m4,C2_m5)
+r.squaredGLMM(C2_m4)
+r.squaredGLMM(C2_m4)[2] - r.squaredGLMM(C2_m3)[2]
+
+####Power Analysis
+#f2 obtained from Rc2 in Experiment 1
+pwr.f2.test(u = 2, v = 130 - 2 - 1, f2 = 0.11/(1 - 0.11), sig.level = 0.05)
+
+###Overall analysis
+lmerTest::lmer(cause_rating ~ frequency*agent*scenario + (1 | participant), df.exp2_long)%>% summary()
+
+```
+#Execptation Judgment
+```{r}
+#Experiment 2: Expectation Rating
+
+E2_m1 <- lmer(expect_rating ~ frequency +(1|participant), df.exp2_long, REML=F)
+E2_m2 <- lmer(expect_rating ~ agent +(1|participant), df.exp2_long, REML=F)
+E2_m3 <- lmer(expect_rating ~ agent + frequency +(1|participant), df.exp2_long, REML=F)
+E2_m4 <- lmer(expect_rating ~ agent*frequency +(1|participant), df.exp2_long, REML=F)
+E2_m5 <- lmer(expect_rating ~ agent*frequency*scenario +(1|participant), df.exp2_long, REML=F)
+
+##Effect of agent
+anova(E2_m1,E2_m3)
+r.squaredGLMM(E2_m2)
+r.squaredGLMM(E2_m3)[2] - r.squaredGLMM(E2_m1)[2]
+
+##Effect of frequency
+anova(E2_m2,E2_m3)
+r.squaredGLMM(E2_m1)
+r.squaredGLMM(E2_m3)[2] - r.squaredGLMM(E2_m2)[2]
+
+
+##Interaction of frequency and agent
+anova(E2_m3,E2_m4)
+r.squaredGLMM(E2_m4)
+r.squaredGLMM(E2_m4)[2] - r.squaredGLMM(E2_m3)[2]
+
+##Three-way interaction frequency x agents x scenario
+anova(E2_m4,E2_m5)
+r.squaredGLMM(E2_m4)
+r.squaredGLMM(E2_m4)[2] - r.squaredGLMM(E2_m3)[2]
+
+##Test for agents in 'one frequent' condition
+E2_t3 <- lmer(expect_rating ~ (1|participant), data=df.exp2_long[df.exp2_long$frequency=="Agent 2 infrequent",], REML=F)
+E2_t4 <- lmer(expect_rating ~ agent + (1|participant), df.exp2_long[df.exp2_long$frequency=="Agent 2 infrequent",], REML=F)
+anova(E2_t3,E2_t4)
+
+##Test for scenario interaction with frequency for fixed agent
+E2_t5 <- lmer(expect_rating ~ 
+              (1|participant), 
+               df.exp2_long[df.exp2_long$frequency=="Both agents frequent",], REML=F)
+
+E2_t6 <- lmer(expect_rating ~ scenario+
+               (1|participant), 
+               df.exp2_long[df.exp2_long$frequency=="Both agents frequent",], REML=F)
+anova(E2_t5,E2_t6)
+
+
+####Power Analysis
+#f2 obtained from Exp 1
+pwr.f2.test(u = 2, v = 130 - 2 - 1, f2 = 0.18/(1 - 0.18), sig.level = 0.05)
+
+###Overall analysis
+lmerTest::lmer(expect_rating ~ frequency*agent*scenario + (1 | participant), df.exp2_long)%>% summary()
+
+```
+
+###Descriptives
+```{r}
+###Experiment 2
+#####Descriptives 
+
+#### Summary across scenarios
+df.exp2_desc<- df.exp2_long %>%
+  group_by(frequency, agent) %>%
+  summarise(c_mean = mean(cause_rating), #causal rating
+            c_sd   = sd(cause_rating),
+            c_se   = c_sd / sqrt(n()),
+            c_upper_ci = c_mean+c_se*1.96, 
+            c_lower_ci = c_mean-c_se*1.96,
+            e_mean = mean(expect_rating), #expectation rating
+            e_sd   = sd(expect_rating),
+            e_se   = e_sd / sqrt(n()),
+            e_upper_ci = e_mean+e_se*1.96, 
+            e_lower_ci = e_mean-e_se*1.96) 
+
+#####By scenario, across agents  
+df.exp2_desc2<- df.exp2_long%>%
+  group_by(frequency, scenario) %>%
+  summarise(c_mean = mean(cause_rating),#causal rating
+            c_sd   = sd(cause_rating), 
+            c_se   = c_sd / sqrt(n()), 
+            c_upper_ci = c_mean+c_se*1.96, 
+            c_lower_ci = c_mean-c_se*1.96, 
+            e_mean = mean(expect_rating), #epistemic rating
+            e_sd   = sd(expect_rating), 
+            e_se   = e_sd / sqrt(n()),
+            e_upper_ci = e_mean+e_se*1.96, 
+            e_lower_ci = e_mean-e_se*1.96)
+
+#### Combine both Descriptive tables in one dataframe
+df.exp2_desc <- rbind(df.exp2_desc, df.exp2_desc2)
+rm(df.exp2_desc2)  
+  
+```
+
+###Plot
+#Causal Judgments
+```{r}
+
+### Experiment 2
+# Set theme
+myTheme <-   theme(axis.title.x  = element_blank(), 
+                   axis.title.y = element_text(color="black", size = 18, vjust=.9), 
+                   axis.text.x = element_text(color="black", size = 18, vjust=.9),
+                   axis.text.y = element_text(color="black", size = 18, vjust=.9), 
+                   strip.text.x = element_text(color="black", size = 18),
+                   legend.text = element_text(color="black", size = 18),
+                   legend.title = element_text(color="black", size = 18),
+                   legend.position = "top",
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   strip.background = element_rect(fill="white"))
+ 
+#set colour palettes   
+cPalette <- c("#333300", "#CCCC99")
+ePalette<- c("#969696", "#f7f7f7")
+level_order <- c('Both agents frequent', 'Agent 2 infrequent')
+
+
+#Create Plot
+Fig2a <- ggplot(df.exp2_long, aes(x=factor(frequency, levels=level_order), cause_rating, fill=agent)) +
+  coord_cartesian(ylim = c(1,7.5)) +
+  scale_y_continuous(breaks = seq(0, 7, by=1))+
+  scale_x_discrete(labels=c("Both Agents frequent", "Agent 2 infrequent")) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
+  stat_summary(fun.data= mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
+  geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.15), alpha =  0.08,   
+  colour= "black")+
+  scale_fill_manual(values=cPalette,name='Agent', labels=c("Agent 1", "Agent 2") )+
+  labs( y="Causal Agreement Rating")+
+  #facet_grid(~scenario, scales="free_x")+
+  theme_bw()+
+  myTheme
+
+#Show plot
+plot(Fig2a)
+
+#Save Plot
+ggsave(Fig2a, file="Fig2a.pdf", dpi=400, height = 6, width = 8)
+
+```
+
+###Plot
+#Expectation Judgmet
+```{r}
+
+#Create plot
+Fig2b <- ggplot(df.exp2_long, aes(x=factor(frequency, levels=level_order), expect_rating, fill=agent)) +
+  coord_cartesian(ylim = c(1,7.5)) +
+  scale_y_continuous(breaks = seq(1, 7, by=1))+
+  scale_x_discrete(labels=c("Both Agents frequent", "Agent 2 infrequent")) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
+  geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.15), alpha = 
+  0.08, colour = "black")+
+  scale_fill_manual(values=ePalette, name='Agent', labels=c("Agent 1", "Agent 2"))+
+  labs( y="Expectation Agreement Rating")+
+  #facet_grid(~scenario, scales="free_x")+
+  theme_bw()+
+  myTheme
+
+#Show plot
+plot(Fig2b)
+
+#Save plot
+ggsave(Fig2b, file="Fig2b.pdf", dpi=400, height = 6, width = 8)
+```
+
+
+### Experiment 3
+# Read in data
+```{r}
+###Experiment 3
+##Read in Data
+
+df.data3 = read.csv(file = "Exp_3.csv", stringsAsFactors = F, sep = ",") %>% 
+  filter(row_number() > 2) %>% # additional rows in qualtrics csv
+  clean_names() %>% 
+  filter(!age =="", #exclude bot fails,
+         progress ==100| progress==99)
+
+```
+
+## Experiment 3: Structure and edit data
+
+```{r}
+
+df.exp3 = df.data3 %>% 
+  mutate(participant = 1:n()) %>% 
+  rename(duration=duration_in_seconds) %>% 
+  select(c_one_office:c_sep_freq_1,
+         participant,
+         order,
+         age,
+         gender,
+         duration,
+         condition,
+         -starts_with("q")) %>% 
+  gather("index", "value", -c(participant, order, condition))%>% 
+  filter(value != "") %>%
+  arrange(index)%>%
+  mutate(index = ifelse(str_detect(index, "one_office"),
+                        "one_check_office",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_know"),
+                        "one_check_know",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_day"),
+                        "one_check_day",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_struc"),
+                        "one_check_struc",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_freq"),
+                        "one_check_freq",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "sep_office"),
+                        "sep_check_office",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "sep_know"),
+                        "sep_check_know",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "sep_day"),
+                        "sep_check_day",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "sep_struc"),
+                        "sep_check_struc",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "sep_freq"),
+                        "sep_check_freq",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_exp_a1"),
+                        "one_expectation_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_exp_a2"),
+                        "one_expectation_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "sep_exp_a1"),
+                        "sep_expectation_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "sep_exp_a2"),
+                        "sep_expectation_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index,"one_cause_a1"),
+                        "one_cause_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "one_cause_a2"),
+                        "one_cause_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "sep_cause_a1"),
+                        "sep_cause_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "sep_cause_a2"),
+                        "sep_cause_a2",
+                        index))%>%
+  mutate(order = ifelse(order == 1,"agent 1 first", 
+                          ifelse(order == 2, "agent 2 first", " ")))%>%
+  mutate(scenario = ifelse((condition == 1| condition== 2), "Microwave", "Coffee"))%>%
+  mutate(scenario_order = ifelse((condition == 1| condition== 3), "Join first", "Sep first"))%>%
+  spread(index, value) %>%
+  arrange(participant) 
+
+```
+
+### Set filter
+```{r}
+###Experiment 3
+#### Create filter
+df.exp3<- df.exp3  %>%  
+  mutate(check_total=if_else(sep_check_know=="2", 1, 0)) %>% 
+  mutate(check_total=if_else(sep_check_office =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(sep_check_day =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(sep_check_struc=="2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(sep_check_freq=="1",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_know =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_office =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_day =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_struc =="2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(one_check_freq =="1", check_total+1, check_total))
+   
+#Apply and set filter        
+df.exp3<-df.exp3 %>% 
+  filter(check_total >=5) #Set to 10 to change exlusion criterion to "all check questions correct"
+
+```
+
+### Demographics
+```{r}
+###Experiment 3
+#####Demographics
+
+df.exp3_demo <- df.exp3 %>% 
+  select(age, gender, duration) %>% 
+  mutate(age=as.numeric(age))%>%
+  mutate(duration=as.numeric(duration)) %>% 
+  transform(gender= ifelse(gender==1, "Male", #recode numbers into gender categories
+                    ifelse(gender==2, "Female",
+                    ifelse(gender==3, "Prefer not to say", gender)))) %>% 
+  filter(age<100 |age ==" ") %>% #remove outliers (year) or N.A.s
+  summarize(n=n(),
+             female=sum(gender=="Female"),
+             not_say=sum(gender=="Prefer not to say"),
+             mean_age = mean(age),
+             std_age=sd(age),
+             mean_time=mean(duration/60),
+             sd_time=sd(duration/60)
+            )
+```
+
+### Create dataframe for analysis
+```{r}
+###Experiment 3
+###create data frame in long format with causal and expectation responses
+
+df.exp3_long = df.exp3 %>% 
+  select(scenario,
+         scenario_order,
+         participant,
+         check_total,
+         contains("expect"),
+         contains("cause")) %>% 
+  gather(condition, rating, "one_expectation_a1":"sep_cause_a2") %>%  
+  mutate(type=ifelse(str_detect(condition, "expectation"), "expect_rating", 
+                     ifelse(str_detect(condition, "cause"), "cause_rating", "")))%>% 
+  mutate(knowledge = ifelse(str_detect(condition, "one"),
+                        "Knowledge", "No Knowledge")) %>% 
+  mutate(agent = ifelse(str_detect(condition, "_a1"),
+                        "Normal Agent", "Abnormal Agent")) %>% 
+  mutate(rating=as.numeric(rating)) %>% 
+  select(-condition) %>% 
+  spread(type, rating) 
+
+```
+
+
+#Data Analysis
+### Expectation Judgment
+
+```{r}
+#Experiment 3: Expectation Rating
+
+E3_m1 <- lmer(expect_rating ~ agent +(1|participant), df.exp3_long, REML=F)
+E3_m2 <- lmer(expect_rating ~ knowledge +(1|participant), df.exp3_long, REML=F)
+E3_m3 <- lmer(expect_rating ~ agent + knowledge +(1|participant), df.exp3_long, REML=F)
+E3_m4 <- lmer(expect_rating ~ agent*knowledge +(1|participant), df.exp3_long, REML=F)
+E3_m5 <- lmer(expect_rating ~ agent*knowledge*scenario +(1|participant), df.exp3_long, REML=F)
+
+##Effect of agent
+anova(E3_m2,E3_m3)
+r.squaredGLMM(E3_m3)[2] - r.squaredGLMM(E3_m2)[2]
+
+##Effect of knowledge
+anova(E3_m1,E3_m3)
+r.squaredGLMM(E3_m3)[2] - r.squaredGLMM(E3_m1)[2]
+
+##Interaction of knowledge and agent
+anova(E3_m3,E3_m4)
+r.squaredGLMM(E3_m4)[2] - r.squaredGLMM(E3_m3)[2]
+
+##... interaction with scenario
+anova(E3_m5,E3_m4)
+r.squaredGLMM(E3_m4)[2] - r.squaredGLMM(E3_m3)[2]
+
+
+##Test for agent in 'knowlege' condition
+E3_t3 <- lmer(expect_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
+E3_t4 <- lmer(expect_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
+anova(E3_t3,E3_t4)
+
+##Test for agent in 'no knowlege' condition
+E3_t5 <- lmer(expect_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
+E3_t6 <- lmer(expect_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
+anova(E3_t5,E3_t6)
+
+###Power analysis
+powerSim(E3_m5,fixed("agentNormal Agent", "z"), alpha=0.045, nsim = 50) #Effect "agent"
+powerSim(E3_m5,fixed("knowledgeNo Knowledge", "z"), alpha=0.045, nsim = 50) # Effect "Knowledge""
+powerSim(E3_m5,fixed("agentNormal Agent:knowledgeNo Knowledge", "z"), alpha=0.045, nsim = 50) #Interaction "Knowledge x Agent" 
+###Primary analysis
+lmerTest::lmer(expect_rating ~ agent*knowledge*scenario + (1 | participant), df.exp3_long)%>% summary()
+```
+
+#Causal Judgment
+```{r}
+
+#Experiment 3: Causal Rating
+
+C3_m1 <- lmer(cause_rating ~ agent +(1|participant), df.exp3_long, REML=F)
+C3_m2 <- lmer(cause_rating ~ knowledge +(1|participant), df.exp3_long, REML=F)
+C3_m3 <- lmer(cause_rating ~ agent + knowledge +(1|participant), df.exp3_long, REML=F)
+C3_m4 <- lmer(cause_rating ~ agent*knowledge +(1|participant), df.exp3_long, REML=F)
+C3_m5 <- lmer(cause_rating ~ knowledge*agent*scenario +(1|participant), df.exp3_long, REML=F)
+
+##Effect of agent
+anova(C3_m2,C3_m3)
+r.squaredGLMM(C3_m3)[2] - r.squaredGLMM(C3_m2)[2]
+
+##Effect of knowledge
+anova(C3_m1,C3_m3)
+r.squaredGLMM(C3_m3)[2] - r.squaredGLMM(C3_m1)[2]
+
+##Interaction of knowledge and agent
+anova(C3_m3,C3_m4)
+r.squaredGLMM(C3_m4)[2] - r.squaredGLMM(C3_m3)[2]
+
+##Test for agent in 'knowlege' condition
+C3_t3 <- lmer(cause_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
+C3_t4 <- lmer(cause_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
+anova(C3_t3,C3_t4)
+
+##Test for agent in 'no knowlege' condition
+C3_t5 <- lmer(cause_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
+C3_t6 <- lmer(cause_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
+anova(C3_t5,C3_t6)
+
+##Three way interaction with scenario
+anova(C3_m4,C3_m5)
+r.squaredGLMM(C3_m5)[2] - r.squaredGLMM(C3_m4)[2]
+
+###Power analysis
+powerSim(C3_m5,fixed("agentNormal Agent", "z"), alpha=0.045, nsim = 50) #Effect "agent"
+powerSim(C3_m5,fixed("agentNormal Agent:knowledgeNo Knowledge", "z"), alpha=0.045, nsim = 50) #Interaction "Knowledge x Agent"
+
+###Overall analysis
+lmerTest::lmer(cause_rating ~ knowledge*agent*scenario + (1 | participant), df.exp3_long)%>% summary()
+
+```
+
+### Descriptives
+```{r}
+###Experiment 3
+#####Descriptives 
+
+#####Across scenario
+df.exp3_desc<- df.exp3_long %>%
+  group_by(knowledge, agent) %>%
+  summarise(c_mean = mean(cause_rating),
+            c_sd   = sd(cause_rating),
+            c_se   = c_sd / sqrt(n()),
+            c_upper_ci = c_mean+c_se*1.96, 
+            c_lower_ci = c_mean-c_se*1.96, 
+            e_mean = mean(expect_rating),
+            e_sd   = sd(expect_rating),
+            e_se   = e_sd / sqrt(n()),
+            e_upper_ci = e_mean+e_se*1.96, 
+            e_lower_ci = e_mean-e_se*1.96) 
+
+
+#####By scenario, across agents  
+df.exp3_desc2<- df.exp3_long%>%
+  group_by(knowledge, agent, scenario) %>%
+  summarise(c_mean = mean(cause_rating),#causal rating
+            c_sd   = sd(cause_rating), #causal rating
+            c_se   = c_sd / sqrt(n()), #causal rating
+            e_mean = mean(expect_rating), #epistemic rating
+            e_sd   = sd(expect_rating), #epistemic rating
+            e_se   = e_sd / sqrt(n())) #epistemic rating
+
+#### Combine both Descriptive tables in one dataframe
+df.exp3_desc <- rbind(df.exp3_desc, df.exp3_desc2)
+rm(df.exp3_desc2)  
+  
+```
+
+#Create dataframe for plot
+```{r}
+###Create new dataframe with merged ratings
+
+df.exp3_long2<-df.exp3_long %>% 
+gather(ratingtype, rating, cause_rating:expect_rating) %>% 
+df.exp3_long2 %>% 
+ mutate(color = interaction(ratingtype, agent, sep=".")) %>% 
+ mutate(agent =factor(agent,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+ mutate(ratingtype =factor(ratingtype,levels=c( "expect_rating", "cause_rating"))) %>% 
+ mutate(ratingtype =recode(ratingtype,
+                            "expect_rating"= "Expectation Rating",
+                            "cause_rating"= "Causal Rating"))
+
+```
+
+##Plot 
+#Expectation and Causal Ratings
+```{r}
+### Experiment 3
+#### Plot
+
+
+#set theme
+myTheme <-   theme(plot.title=element_text(size=18, 
+                                    face="bold", 
+                                    hjust=0.5,
+                                    lineheight=1.2),
+                   axis.title.x  = element_blank(), 
+                   axis.title.y = element_text(color="black", size = 18, vjust=.9), 
+                   axis.text.x =  element_text(color="black", size = 16, vjust=.9),
+                   axis.text.y = element_text(color="black", size = 18), 
+                   strip.text.x = element_text(color="black", size = 16),
+                   legend.text = element_text(color="black", size = 18),
+                   legend.title = element_text(color="black", size = 18),
+                   legend.position = "top",
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   strip.background = element_rect(fill="white"))
+    
+#set colour palette
+Palette<-c("#333300", "#f7f7f7",  "#CCCC99",  "#969696")
+
+
+#### create plot for `knowledge' condition
+
+Knowledge <- df.exp3_long2 %>% 
+  filter(knowledge=="Knowledge") %>% 
+  ggplot(aes(x=agent, y=rating, fill=color)) +
+  coord_cartesian(ylim = c(1,7.5)) +
+  scale_y_continuous(breaks = seq(0, 7, by=1))+
+  scale_x_discrete(labels=c("Normal Agent", "Abnormal Agent")) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
+  stat_summary(fun.data= mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.1) +
+  geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.7), alpha = 
+  0.08, colour = "black")+
+  facet_grid(.~ratingtype, scales = "free")+
+  scale_fill_manual(values=Palette, labels=c("Normal Agent", "Abnormal Agent", "Normal Agent", "Abnormal Agent"))+
+  labs( y="Agreement Rating")+
+  theme_bw()+
+  myTheme+
+  theme(legend.position= "none")+
+  labs(title="Knowledge")
+
+#show plot
+plot(Knowledge)
+
+#### create plot for `no knowledge' condition
+
+NoKnowledge <- df.exp3_long2 %>% 
+  filter(knowledge=="No Knowledge") %>% 
+  ggplot(aes(x=agent, y=rating, fill=color)) +
+  coord_cartesian(ylim = c(1,7.5)) +
+  scale_y_continuous(breaks = seq(0, 7, by=1))+
+  scale_x_discrete(labels=c("Normal Agent", "Abnormal Agent")) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
+  stat_summary(fun.data= mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.1) +
+  geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.7), alpha =  0.08,   
+  colour= "black")+
+  facet_grid(.~ratingtype, scales = "free")+
+  scale_fill_manual(values=Palette, name='Agent', labels=c("Normal Agent", "Abnormal Agent", "Normal Agent", "Abnormal Agent"))+
+  labs( y="Agreement Rating")+
+  theme_bw()+
+  myTheme+
+  theme(legend.position= "none")+
+  labs(title="No Knowledge")
+
+### show plot
+plot(NoKnowledge)
+
+### merge plots with `knowledge' and `no knowledge' condition
+Fig3 <- ggarrange(Knowledge, NoKnowledge,
+                    ncol = 1, 
+                    nrow = 2)
+### show plot
+plot(Fig3)
+
+### save plot
+ggsave(Fig3, file="Fig3.pdf", dpi=400, height = 8, width = 8)
+
+```
+
+###### Bayesian Network model
+
+####Load relevant packages
+
+```{r}
+install.packages("bnlearn")
+install.packages("Rgraphviz")
+install.packages("bnviewer")
+```
+
+```{r}
+library("bnlearn")
+library("Rgraphviz")
+library("bnviewer")
+```
+
+###Bayesian Network Model
+# Version `Knowledge' 
+```{r}
+######Bayesian Model Part
+#Model 1: Knowledge about each other
+
+
+###Graph Structure
+
+dag = model2network("[NormalityA][NormalityB][AexpectsB|NormalityB][BexpectsA|NormalityA][MentalStateA][MentalStateB][ActionA|NormalityA:AexpectsB:MentalStateA][ActionB|NormalityB:BexpectsA:MentalStateB][Outcome|ActionA:ActionB]")
+
+###Variables
+
+NormalityA.lv = c("F", "T")
+NormalityB.lv = c("F", "T")
+AexpectsB.lv = c("F", "T")
+BexpectsA.lv = c("F", "T")
+MentalStateA.lv = c("F", "T")
+MentalStateB.lv = c("F", "T")
+ActionA.lv = c("F", "T")
+ActionB.lv = c("F", "T")
+Outcome.lv = c("F", "T")
+
+###Conditional Probablities
+
+NormalityA.prob = array(c(0.2, 0.8), dim = 2, dimnames = list(NormalityA = NormalityA.lv))
+NormalityB.prob = array(c(0.2, 0.8), dim = 2, dimnames = list(NormalityB = NormalityB.lv))
+AexpectsB.prob = array(c(0.9, 0.1, 0.1, 0.9), dim = c(2,2), dimnames = list(AexpectsB = AexpectsB.lv, NormalityB= NormalityB.lv))
+BexpectsA.prob = array(c(0.9, 0.1, 0.1, 0.9), dim = c(2,2), dimnames = list(BexpectsA = BexpectsA.lv, NormalityA= NormalityA.lv))
+MentalStateA.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(MentalStateA = MentalStateA.lv))
+MentalStateB.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(MentalStateB = MentalStateB.lv))
+ActionA.prob = array(c(0.8, 0.2, 0.9,0.1, 0.8, 0.2,0.1,0.9,0.2,0.8,0.9,0.1, 0.2, 0.8, 0.1,0.9), dim = c(2, 2, 2, 2), dimnames = list(ActionA=ActionA.lv, AexpectsB = AexpectsB.lv, MentalStateA = MentalStateA.lv, NormalityA = NormalityA.lv))
+ActionB.prob = array(c(0.8, 0.2, 0.9,0.1, 0.8, 0.2,0.1,0.9,0.2,0.8,0.9,0.1, 0.2, 0.8, 0.1,0.9), dim = c(2, 2, 2, 2), dimnames = list(ActionB=ActionB.lv, BexpectsA = BexpectsA.lv, MentalStateB = MentalStateB.lv, NormalityB = NormalityB.lv))
+Outcome.prob = array(c(1, 0, 1, 0, 1, 0, 0, 1), dim = c(2,2, 2), dimnames = list(Outcome = Outcome.lv, ActionA=ActionA.lv, ActionB=ActionB.lv))
+
+cpt = list(NormalityA = NormalityA.prob, 
+             NormalityB = NormalityB.prob,
+             AexpectsB = AexpectsB.prob,
+             BexpectsA = BexpectsA.prob,
+             MentalStateA=MentalStateA.prob,
+             MentalStateB=MentalStateB.prob,
+             ActionA=ActionA.prob,
+             ActionB=ActionB.prob,
+             Outcome=Outcome.prob)
+      
+###set up model        
+survey = custom.fit(dag, cpt)
+
+### plot model
+graphviz.plot(dag)
+
+```
+
+#Estimation of Conditional Probablity for mental state
+```{r}
+#############Mental State
+
+##### Mental State for Abnormal Agent
+## mental state true
+M_Abnormal<-cpquery(survey, event = (MentalStateB == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") &(ActionB == "T") &(Outcome == "T"), n=10000000 )
+
+
+#### Mental State for Normal Agent
+## mental state true
+M_Normal<-cpquery(survey, event = (MentalStateA == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") , n=10000000 )
+
+```
+
+#Estimation of Conditional Probablity for epistemic state
+```{r}
+#############Epistemic State
+
+##### Epistemic State for Abnormal Agent
+## epistemic  state true
+E_Abnormal<-cpquery(survey, event = (BexpectsA == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") &(Outcome == "T"), n=10000000 )
+
+#### Epistemic State for Normal Agent
+## epistemic  state true
+E_Normal<-cpquery(survey, event = (AexpectsB == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") , n=10000000 )
+```
+
+#create dataframe with cpqs
+```{r}
+
+df.Knowledge<-data.frame(Prediction=c(M_Abnormal, M_Normal, E_Abnormal, E_Normal), Condition=c("Abnormal Agent", "Normal Agent", "Abnormal Agent", "Normal Agent"), InferenceType=c("Mental State", "Mental State", "Expectation about other agent", "Expectation about other agent")) %>% 
+  mutate(Prediction = round(Prediction, digits=2)) %>% 
+  mutate(Knowledge = "Knowledge")
+
+```
+
+#Plots for model predictions `Knowledge'
+
+```{r}
+####Graph Predictions:
+
+#set theme
+myTheme <-   theme(plot.title=element_text(size=18, 
+                                    face="bold", 
+                                    hjust=0.5,
+                                    lineheight=1.2),
+                   axis.title.x  = element_blank(), 
+                   axis.title.y = element_text(color="black", size = 18, vjust=.9), 
+                   axis.text.x = element_text(color="black", size = 16),
+                   axis.text.y = element_text(color="black", size = 18), 
+                   strip.text.x = element_text(color="black", size = 16),
+                   legend.text = element_text(color="black", size = 18),
+                   legend.title = element_text(color="black", size = 18),
+                   legend.position = "top",
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   strip.background = element_rect(fill="white"))
+
+#set colour palette 
+ecPalette<-c("gray13", "khaki4")
+
+#create plot
+FigXa <-df.Knowledge %>% 
+  mutate(Condition =factor(Condition,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+  ggplot(aes(x=factor(Condition), Prediction, fill=Condition)) +
+  geom_bar(stat="identity", position = "dodge", colour = "black", alpha=0.6)+
+  coord_cartesian(ylim = c(0,1.1)) +
+  geom_text(aes(label=scales::percent(Prediction, accuracy = 1)),  vjust=-0.6, color="black", size=6)+
+  labs( y="Probablity")+
+  scale_y_continuous(labels =scales::percent_format(accuracy = 1), breaks = seq(0, 1, by=0.25))+
+  scale_fill_manual(values = ePalette)+
+  facet_grid(~InferenceType)+
+  theme_bw()+
+  myTheme+
+  theme(legend.position= "none")+
+  labs(title="Knowledge")
+
+###show plot
+plot(FigXa)
+```
+
+###Bayesian Network Model
+# Version `No Knowledge' 
+```{r}
+# Version `No Knowledge' 
+
+#Graph Structure
+ dag2 = model2network("[NormalityA][NormalityB][AexpectsB][BexpectsA][MentalStateA][MentalStateB][ActionA|NormalityA:AexpectsB:MentalStateA][ActionB|NormalityB:BexpectsA:MentalStateB][Outcome|ActionA:ActionB]")
+
+#Variables
+
+NormalityA.lv = c("F", "T")
+NormalityB.lv = c("F", "T")
+AexpectsB.lv = c("F", "T")
+BexpectsA.lv = c("F", "T")
+MentalStateA.lv = c("F", "T")
+MentalStateB.lv = c("F", "T")
+ActionA.lv = c("F", "T")
+ActionB.lv = c("F", "T")
+Outcome.lv = c("F", "T")
+
+#Conditional  probabilities
+
+NormalityA.prob = array(c(0.2, 0.8), dim = 2, dimnames = list(NormalityA = NormalityA.lv))
+NormalityB.prob = array(c(0.2, 0.8), dim = 2, dimnames = list(NormalityB = NormalityB.lv))
+AexpectsB.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(AexpectsB = AexpectsB.lv)) #### independent node
+BexpectsA.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(BexpectsA = BexpectsA.lv)) #### independent node
+MentalStateA.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(MentalStateA = MentalStateA.lv))
+MentalStateB.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(MentalStateB = MentalStateB.lv))
+ActionA.prob = array(c(0.8, 0.2, 0.9,0.1, 0.8, 0.2,0.1,0.9,0.2,0.8,0.9,0.1, 0.2, 0.8, 0.1,0.9), dim = c(2, 2, 2, 2), dimnames = list(ActionA=ActionA.lv, AexpectsB = AexpectsB.lv, MentalStateA = MentalStateA.lv, NormalityA = NormalityA.lv))
+ActionB.prob = array(c(0.8, 0.2, 0.9,0.1, 0.8, 0.2,0.1,0.9,0.2,0.8,0.9,0.1, 0.2, 0.8, 0.1,0.9), dim = c(2, 2, 2, 2), dimnames = list(ActionB=ActionB.lv, BexpectsA = BexpectsA.lv, MentalStateB = MentalStateB.lv, NormalityB = NormalityB.lv))
+Outcome.prob = array(c(1, 0, 1, 0, 1, 0, 0, 1), dim = c(2,2, 2), dimnames = list(Outcome = Outcome.lv, ActionA=ActionA.lv, ActionB=ActionB.lv))
+
+cpt2 = list(NormalityA = NormalityA.prob, 
+             NormalityB = NormalityB.prob,
+             AexpectsB = AexpectsB.prob,
+             BexpectsA = BexpectsA.prob,
+             MentalStateA=MentalStateA.prob,
+             MentalStateB=MentalStateB.prob,
+             ActionA=ActionA.prob,
+             ActionB=ActionB.prob,
+             Outcome=Outcome.prob)
+
+#Set up model
+survey2 = custom.fit(dag2, cpt2)
+
+# plot model
+graphviz.plot(dag2)
+
+```
+
+#Estimation of Conditional Probablity for mental state
+
+```{r}
+#############Mental State
+##### Mental State for Abnormal Agent
+## mental state true
+M_Abnormal2<-cpquery(survey2, event = (MentalStateB == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") &(ActionB == "T") &(Outcome == "T"), n=10000000 )
+
+
+#### Mental State for Normal Agent
+## mental state true
+M_Normal2<-cpquery(survey2, event = (MentalStateA == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") , n=10000000 )
+```
+
+#Estimation of Conditional Probablity for epistemic state
+
+```{r}
+##### Epistemic State for Abnormal Agent
+## epistemic  state true
+E_Abnormal2<-cpquery(survey2, event = (BexpectsA == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") &(Outcome == "T"), n=10000000 )
+
+#### Epistemic State for Normal Agent
+## epistemic  state true
+E_Normal2<-cpquery(survey2, event = (AexpectsB == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") , n=10000000 )
+```
+
+#create dataframe with cpqs
+
+```{r}
+
+df.NoKnowledge<-data.frame(Prediction=c(M_Abnormal2, M_Normal2, E_Abnormal2, E_Normal2), Condition=c("Abnormal Agent", "Normal Agent", "Abnormal Agent", "Normal Agent"), InferenceType=c("Mental State", "Mental State", "Expectation about other agent", "Expectation about other agent")) %>% 
+  mutate(Prediction = round(Prediction, digits=2)) %>% 
+  mutate(Knowledge="No Knowledge")
+
+```
+
+#Plot model predictions `No Knowledge'
+```{r}
+
+####Set theme
+myTheme <-   theme(plot.title=element_text(size=18, 
+                                    face="bold", 
+                                    hjust=0.5,
+                                    lineheight=1.2),
+                   axis.title.x  = element_blank(), 
+                   axis.title.y = element_text(color="black", size = 18, vjust=.9), 
+                   axis.text.x = element_text(color="black", size = 16),
+                   axis.text.y = element_text(color="black", size = 18), 
+                   strip.text.x = element_text(color="black", size = 16),
+                   legend.text = element_text(color="black", size = 18),
+                   legend.title = element_text(color="black", size = 18),
+                   legend.position = "top",
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   strip.background = element_rect(fill="white"))
+ 
+#set colour palette   
+ePalette<- c("#969696", "#f7f7f7")
+
+#create plot
+FigXb <- df.NoKnowledge %>% 
+  mutate(Condition =factor(Condition,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+  ggplot(aes(x=factor(Condition), Prediction, fill=Condition)) +
+  geom_bar(stat="identity", position = "dodge", colour = "black", alpha=0.6)+
+  coord_cartesian(ylim = c(0,1.1)) +
+  geom_text(aes(label=scales::percent(Prediction, accuracy = 1)),  vjust=-0.6, color="black", size=6)+
+  labs( y="Probablity")+
+  scale_y_continuous(labels =scales::percent_format(accuracy = 1), breaks = seq(0, 1, by=0.25))+
+  scale_fill_manual(values = ePalette)+
+  facet_grid(~InferenceType)+
+  theme_bw()+
+  myTheme+
+  theme(legend.position= "none")+
+    labs(title="No Knowledge")
+
+
+###show plot
+plot(FigXb)
+```
+
+##create one plot wit predictions from 
+#`Knowledge' and `No Knowledge' version
+```{r}
+#create plot
+FigX <- ggarrange(FigXa, FigXb,
+                    ncol = 1, 
+                    nrow = 2)
+#show plot
+plot(FigX)
+
+#save plot
+ggsave(FigX, file="FigX.pdf", dpi=400, height = 8, width = 8)
+```
+
+# Experiment 4:
+## Read in Data
+
+```{r}
+df.data4 = read.csv(file = "Exp_4.csv", stringsAsFactors = F, sep = ",") %>% 
+  filter(row_number() > 2) %>% # additional rows in qualtrics csv
+  clean_names() %>% 
+  filter(!distribution_channel == "preview", #exclude preview trials, 
+         !age==" ", #exclude bot fails,
+         progress  >= 99 ) #exclude people who did not complete the survey
+
+```
+
+## Structure and edit data
+```{r}
+
+df.exp4 = df.data4 %>% 
+  mutate(participant = 1:n()) %>% 
+  rename(order = question_order)%>%
+  rename(duration=duration_in_seconds) %>% 
+  select(c_know_micro_office:c_no_coffee_freq_2,
+         participant,
+         order,
+         condition,
+         duration,
+         age,
+         gender,
+         -starts_with("q")) %>% 
+  gather("index", "value", -c(participant, condition, order))%>% 
+  filter(value != "") %>%
+  arrange(index)%>%
+  mutate(index = ifelse(str_detect(index, "know_micro_office|know_coffee_office"),
+                        "know_check_office",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_micro_know|know_coffee_know"),
+                        "know_check_know",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_micro_day|know_coffee_day"),
+                        "know_check_day",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_micro_struc|know_coffee_struc"),
+                        "know_check_struc",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_micro_freq_1|know_coffee_freq_1"),
+                        "know_check_freq_1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_micro_freq_2|know_coffee_freq_2"),
+                        "know_check_freq_2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "no_micro_office|no_coffee_office"),
+                        "no_check_office",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_micro_know|no_coffee_know"),
+                        "no_check_know",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_micro_day|no_coffee_day"),
+                        "no_check_day",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_micro_struc|no_coffee_struc"),
+                        "no_check_struc",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_micro_freq_1|no_coffee_freq_1"),
+                        "no_check_freq_1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_micro_freq_2|no_coffee_freq_2"),
+                        "no_check_freq_2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "know_exp_a1"),
+                        "know_expectation_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_exp_a2"),
+                        "know_expectation_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "know_ep_a1_7"),
+                        "know_expect_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_ep_a2_7"),
+                        "know_expect_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "know_ep_a1_8"),
+                        "know_not_mind_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_ep_a2_8"),
+                        "know_not_mind_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "know_ep_a1_6"),
+                        "know_like_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_ep_a2_6"),
+                        "know_like_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "know_ep_a1_1"),
+                        "know_desire_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_ep_a2_1"),
+                        "know_desire_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "know_ep_a1_4"),
+                        "know_intend_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "know_ep_a2_4"),
+                        "know_intend_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "no_exp_a1"),
+                        "no_expectation_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_exp_a2"),
+                        "no_expectation_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "no_ep_a1_7"),
+                        "no_expect_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_ep_a2_7"),
+                        "no_expect_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "no_ep_a1_8"),
+                        "no_not_mind_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_ep_a2_8"),
+                        "no_not_mind_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "no_ep_a1_6"),
+                        "no_like_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_ep_a2_6"),
+                        "no_like_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "no_ep_a1_1"),
+                        "no_desire_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_ep_a2_1"),
+                        "no_desire_a2",
+                        index))%>%
+  mutate(index = ifelse(str_detect(index, "no_ep_a1_4"),
+                        "no_intend_a1",
+                        index))%>% 
+  mutate(index = ifelse(str_detect(index, "no_ep_a2_4"),
+                        "no_intend_a2",
+                        index))%>%
+  mutate(order = ifelse(order == 1,"agent 1 first", 
+                          ifelse(order == 2, "agent 2 first", " ")))%>%
+  mutate(scenario = ifelse((condition == 1| condition== 2), "Microwave", "Coffee"))%>%
+  mutate(scenario_order = ifelse((condition == 1| condition== 3), "Both first", "One first"))%>%
+  spread(index, value) %>%
+  arrange(participant)
+
+```
+
+#Set filter
+```{r}
+###Experiment 4
+#### Filter Setting
+
+#create filter
+df.exp4<- df.exp4  %>% 
+  mutate(no_check_freq=paste(no_check_freq_1, no_check_freq_2, sep=",")) %>% 
+  mutate(know_check_freq=paste(know_check_freq_1, know_check_freq_2, sep=",")) %>% 
+  select (-c(no_check_freq_1, no_check_freq_2, know_check_freq_1, know_check_freq_2)) %>% 
+  mutate(check_total=if_else(no_check_know=="2", 1, 0)) %>% 
+  mutate(check_total=if_else(no_check_office =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(no_check_day =="2", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(no_check_struc=="2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(no_check_freq=="1,NA",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(know_check_know =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(know_check_office =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(know_check_day =="1", check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(know_check_struc =="2",check_total+1, check_total)) %>% 
+  mutate(check_total=if_else(know_check_freq =="1,NA", check_total+1, check_total))
+      
+#set and apply filter     
+df.exp4<-df.exp4 %>% 
+  filter(check_total >=5)
+```
+
+#Demographics
+
+```{r}
+
+###Experiment 4
+#####Demographics
+
+df.exp4_demo <- df.exp4 %>% 
+  select(age, gender, duration) %>% 
+  mutate(age=as.numeric(age))%>%
+  mutate(duration=as.numeric(duration)) %>% 
+  transform(gender= ifelse(gender==1, "Male", #recode numbers into gender categories
+                    ifelse(gender==2, "Female",
+                    ifelse(gender==3, "Prefer not to say", gender)))) %>% 
+  filter(age<100 |age ==" ") %>% #remove outliers (year) or N.A.s
+  summarize(n=n(),
+             female=sum(gender=="Female"),
+             not_say=sum(gender=="Prefer not to say"),
+             mean_age = mean(age),
+             std_age=sd(age),
+             mean_time=mean(duration/60),
+             median_time=median(duration/60),
+             sd_time=sd(duration/60)
+            )
+
+```
+
+#create dataframe for analysis
+```{r}
+###Experiment 4
+###create data frame in long format with causal and expectation responses
+
+df.exp4_long = df.exp4 %>% 
+  select(scenario,
+         scenario_order,
+         participant,
+         check_total,
+         contains("know"),
+         contains("no"),
+         -c(contains("check"))) %>% 
+  gather(condition, rating, "know_desire_a1":"no_not_mind_a2") %>%  
+  mutate(type=ifelse(str_detect(condition, "expectation"), "exp_other", 
+                     ifelse(str_detect(condition, "expect"), "exp_outcome",
+                            ifelse(str_detect(condition, "not_mind"), "indifferent",
+                                   ifelse(str_detect(condition, "like"), "like",
+                                          ifelse(str_detect(condition, "desire"), "desire", "intend"
+                                                 )))))) %>% 
+  mutate(knowledge = ifelse(str_detect(condition, "know"),
+                        "Knowledge", "No Knowledge")) %>% 
+  mutate(agent = ifelse(str_detect(condition, "_a1"),
+                        "Normal Agent", "Abnormal Agent")) %>% 
+  mutate(rating=as.numeric(rating)) %>% 
+  select(-condition) %>% 
+  spread(type, rating) %>% 
+  mutate(mental_state= (indifferent+like+desire+intend)/4) #aggregate mental states
+
+
+```
+
+###Data analysis
+#Expectation about each other judgment
+
+```{r}
+
+#Experiment 4: 
+# 1) Expectation about other agents
+
+
+E4_m1 <- lmer(exp_other ~ agent +(1|participant), df.exp4_long, REML=F)
+E4_m2 <- lmer(exp_other ~ knowledge +(1|participant), df.exp4_long, REML=F)
+E4_m3 <- lmer(exp_other ~ agent + knowledge +(1|participant), df.exp4_long, REML=F)
+E4_m4 <- lmer(exp_other ~ agent*knowledge +(1|participant), df.exp4_long, REML=F)
+E4_m5 <- lmer(exp_other ~ knowledge*agent*scenario +(1|participant), df.exp4_long, REML=F)
+
+##Effect of Agent
+anova(E4_m2,E4_m3)
+r.squaredGLMM(E4_m3)[1] - r.squaredGLMM(E4_m2)[1]
+
+##Effect of Knowledge
+anova(E4_m1,E4_m3)
+r.squaredGLMM(E4_m3)[1] - r.squaredGLMM(E4_m1)[1]
+
+##Interaction of knowledge and agent
+anova(E4_m3,E4_m4)
+r.squaredGLMM(E4_m4)[1] - r.squaredGLMM(E4_m3)[1]
+
+##Three way interaction scenario x knowledge x agent
+anova(E4_m4,E4_m5)
+
+#Test for agents in 'Knowledge' condition
+E4_t1 <- lmer(exp_other ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
+E4_t2 <- lmer(exp_other ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
+anova(E4_t1,E4_t2)
+
+#Test for agents in 'No Knowledge' condition
+E4_t3 <- lmer(exp_other ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
+E4_t4 <- lmer(exp_other ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
+anova(E4_t3,E4_t4)
+
+###Overall analysis
+lmerTest::lmer(exp_other ~ knowledge*agent*scenario + (1 | participant), df.exp4_long)%>% summary()
+
+```
+
+###Data analysis
+#Expectation about outcome judgment
+
+```{r}
+
+###Experiment 4: 
+# 2) Expectation about the outcome
+
+### Test Fixed Effects
+Ex4_m1 <- lmer(exp_outcome ~ agent +(1|participant), df.exp4_long, REML=F)
+Ex4_m2 <- lmer(exp_outcome ~ knowledge +(1|participant), df.exp4_long, REML=F)
+Ex4_m3 <- lmer(exp_outcome ~ agent + knowledge +(1|participant), df.exp4_long, REML=F)
+Ex4_m4 <- lmer(exp_outcome ~ agent*knowledge +(1|participant), df.exp4_long, REML=F)
+Ex4_m5 <- lmer(exp_outcome ~ knowledge*agent*scenario +(1|participant), df.exp4_long, REML=F)
+
+##Effect of Knowledge
+anova(Ex4_m1,Ex4_m3)
+r.squaredGLMM(Ex4_m3)[1] - r.squaredGLMM(Ex4_m1)[1]
+
+##Effect of Agent
+anova(Ex4_m3,Ex4_m2)
+r.squaredGLMM(Ex4_m3)[1] - r.squaredGLMM(Ex4_m2)[1]
+
+##Interaction of knowledge and agent
+anova(Ex4_m4,Ex4_m3)
+r.squaredGLMM(Ex4_m4)[1] - r.squaredGLMM(Ex4_m3)[1]
+
+##Three way interaction scenario x knowledge x agent
+anova(Ex4_m5,Ex4_m4)
+r.squaredGLMM(Ex4_m5)[1] - r.squaredGLMM(Ex4_m4)[1]
+
+
+#Test for agents in 'Knowledge' condition
+Ex4_t1 <- lmer(exp_outcome ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
+Ex4_t2 <- lmer(exp_outcome ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
+anova(Ex4_t1,Ex4_t2)
+
+#Test for agents in 'No Knowledge' condition
+Ex4_t3 <- lmer(exp_outcome ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
+Ex4_t4 <- lmer(exp_outcome ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
+anova(Ex4_t3,Ex4_t4)
+
+
+####Agent x Knowledge x Scenario Interaction Decomposition
+
+## Test for Scenario when agent is abnormal and knowledge
+t.test(exp_outcome ~ scenario, data=df.exp4_long[df.exp4_long$knowledge=="Knowledge" & df.exp4_long$agent=="Abnormal Agent", ], paired = F)
+
+## Test for Scenario when agent is normal and knowledge
+t.test(exp_outcome ~ scenario, data=df.exp4_long[df.exp4_long$knowledge=="Knowledge" & df.exp4_long$agent=="Normal Agent", ], paired = F)
+
+## Test for Scenario when agent is abnormal and no knowledge
+#### sign. effect here
+t.test(exp_outcome ~ scenario, data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge" & df.exp4_long$agent=="Abnormal Agent", ], paired = F)
+
+## Test for Scenario when agent is abnormal and no knowledge
+t.test(exp_outcome ~ scenario, data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge" & df.exp4_long$agent=="Normal Agent", ], paired = F)
+
+
+###Overall analysis
+lmerTest::lmer(exp_outcome ~ knowledge*agent*scenario + (1 | participant), df.exp4_long)%>% summary()
+
+```
+
+###Data analysis
+#Mental state judgment
+```{r}
+#Experiment 4
+# 3) Mental State Attribution
+
+M4_m1 <- lmer(mental_state ~ agent +(1|participant), df.exp4_long, REML=F)
+M4_m2 <- lmer(mental_state ~ knowledge +(1|participant), df.exp4_long, REML=F)
+M4_m3 <- lmer(mental_state ~ agent + knowledge +(1|participant), df.exp4_long, REML=F)
+M4_m4 <- lmer(mental_state ~ agent*knowledge +(1|participant), df.exp4_long, REML=F)
+M4_m5 <- lmer(mental_state ~ knowledge*agent*scenario +(1|participant), df.exp4_long, REML=F)
+
+##Effect of Knowledge
+anova(M4_m1,M4_m3)
+r.squaredGLMM(M4_m3)[1] - r.squaredGLMM(M4_m1)[1]
+
+##Effect of Agent
+anova(M4_m3,M4_m2)
+r.squaredGLMM(M4_m3)[1] - r.squaredGLMM(M4_m2)[1]
+
+##Interaction of knowledge and agent
+anova(M4_m3,M4_m4)
+r.squaredGLMM(M4_m4)[1] - r.squaredGLMM(M4_m3)[1]
+
+##Three way interaction with scenario
+anova(M4_m5,M4_m4)
+r.squaredGLMM(M4_m5)[1] - r.squaredGLMM(M4_m4)[1]
+
+#Test for agents in 'Knowledge' condition
+M4_t1 <- lmer(mental_state ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
+M4_t2 <- lmer(mental_state ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
+anova(M4_t1,M4_t2)
+
+#Test for agents in 'No Knowledge' condition
+M4_t3 <- lmer(mental_state ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
+M4_t4 <- lmer(mental_state ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
+anova(M4_t3,M4_t4)
+
+### T Test
+t.test(mental_state ~ agent, data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], paired = F)
+t.test(mental_state ~ agent, data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], paired = F)
+
+
+###Overall analysis
+lmerTest::lmer(mental_state ~ knowledge*agent*scenario + (1 | participant), df.exp4_long)%>% summary()
+
+```
+
+#Descriptives
+```{r}
+###Experiment 4
+#####Descriptives 
+
+
+### Aggregate Mental State Measure
+df.exp4_desc<-df.exp4_long %>% 
+  group_by(knowledge, agent) %>%
+  summarise(mean = mean(mental_state),
+            sd   = sd(mental_state),
+            se   = sd / sqrt(n()),
+            upper_ci = mean+se*1.96, 
+            lower_ci = mean-se*1.96) 
+
+
+#####  all mental states
+df.exp4_desc2<- df.exp4_long%>%
+  gather(ratingtype, rating, desire:like) %>% 
+  group_by(knowledge, agent, ratingtype) %>%
+  summarise(mean = mean(rating),
+            sd   = sd(rating), 
+            se   = sd / sqrt(n()))
+           
+```
+
+###Plot
+#Epistemic Ratings
+```{r}
+
+### Experiment 4
+#### Plots for judgments about expectation about each other and expectation about outcome
+
+# set theme
+myTheme <-   theme(axis.title.x  = element_blank(), 
+                   axis.title.y = element_text(color="black", size = 18, vjust=.9), 
+                   axis.text.x = element_text(color="black", size = 18),
+                   axis.text.y = element_text(color="black", size = 18), 
+                   strip.text.x = element_text(color="black", size = 18),
+                   legend.text = element_text(color="black", size = 18),
+                   legend.title = element_text(color="black", size = 18),
+                   legend.position = "top",
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   strip.background = element_rect(fill="white"))
+    
+
+#set colour palette
+ePalette<- c("#969696", "#f7f7f7", "#333300", "#CCCC99")
+
+#create plot
+Fig4a <- df.exp4_long %>% 
+  gather(ep_state, ep_rating, exp_other, exp_outcome)%>% 
+  select(-desire,
+         -intend,
+         -like,
+         -indifferent) %>% 
+  mutate(ep_state=factor(ep_state,levels=c("exp_other", "exp_outcome"))) %>%
+  mutate(ep_state=recode(ep_state,"exp_other"="Expectation about other agent",
+                          "exp_outcome"="Expectation of outcome"))%>% 
+  rename(Agent = agent) %>% 
+  mutate(Agent =factor(Agent,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+  ggplot(aes(x=knowledge, y=ep_rating, fill=Agent)) +
+  coord_cartesian(ylim = c(1,7.5)) +
+  scale_y_continuous(breaks = seq(0, 7, by=1))+
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
+  stat_summary(fun.data= mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
+  geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.3), alpha = 
+  0.08, colour = "black")+
+  scale_fill_manual(values=ePalette)+
+  labs( y="Agreement Rating")+
+  facet_wrap(~ep_state)+
+  theme_bw()+
+  myTheme
+
+#show plot
+plot(Fig4a)
+
+#save plot
+ggsave(Fig4a, file="Fig4a.pdf", dpi=400, height = 6, width = 9)
+
+
+
+```
+
+###plot
+#mental state ratings
+```{r}
+### Experiment 4
+#### Plots for judgments about mental states
+
+#create plot
+Fig4b <- df.exp4_long %>% 
+    gather(mental_state, mental_rating, desire,indifferent, intend, like) %>% 
+    select(-exp_other,
+           -exp_outcome) %>% 
+  mutate(mental_state=factor(mental_state,levels=c("indifferent", "like", "desire", "intend"))) %>%
+  rename(Agent = agent) %>% 
+  mutate(Agent =factor(Agent,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+  ggplot(aes(x=knowledge, y=mental_rating, fill=Agent)) +
+  coord_cartesian(ylim = c(1,7.5)) +
+  scale_y_continuous(breaks = seq(0, 7, by=1))+
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
+  stat_summary(fun.data= mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
+  geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.3), alpha = 
+  0.08, colour = "black")+
+  scale_fill_manual(values=ePalette)+
+  labs( y="Agreement Rating")+
+  facet_wrap(~mental_state)+
+  theme_bw()+
+  myTheme
+
+#show plot
+plot(Fig4b)
+
+#save plot
+ggsave(Fig4b, file="Fig4b.pdf", dpi=400, height = 9, width = 9)
+
+```
+
