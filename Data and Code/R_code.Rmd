@@ -658,7 +658,7 @@ r.squaredGLMM(C2_m4)[2] - r.squaredGLMM(C2_m3)[2]
 
 ####Power Analysis
 #f2 obtained from Rc2 in Experiment 1
-pwr.f2.test(u = 2, v = 130 - 2 - 1, f2 = 0.11/(1 - 0.11), sig.level = 0.05)
+pwr.f2.test(u = 2, v = 130 - 2 - 1, f2 = .07/(1 - .07), sig.level = 0.05)
 
 ###Overall analysis
 lmerTest::lmer(cause_rating ~ frequency*agent*scenario + (1 | participant), df.exp2_long)%>% summary()
@@ -713,7 +713,7 @@ anova(E2_t5,E2_t6)
 
 ####Power Analysis
 #f2 obtained from Exp 1
-pwr.f2.test(u = 2, v = 130 - 2 - 1, f2 = 0.18/(1 - 0.18), sig.level = 0.05)
+pwr.f2.test(u = 2, v = 130 - 2 - 1, f2 = 0.12/(1 - 0.12), sig.level = 0.05)
 
 ###Overall analysis
 lmerTest::lmer(expect_rating ~ frequency*agent*scenario + (1 | participant), df.exp2_long)%>% summary()
