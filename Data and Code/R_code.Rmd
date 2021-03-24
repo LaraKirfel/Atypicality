@@ -34,10 +34,14 @@ install.packages("pwr") ####?
 install.packages("simr")
 install.packages("Publish")
 install.packages("ggpubr")
+install.packages("ggtext")
+
 
 ```
 
 ```{r, message=FALSE}
+
+library("ggtext")
 library("reshape") # variety of methods for reshaping data prior 
 library("janitor") # for cleaning variable names 
 library("DT") # for nice tables
@@ -230,32 +234,30 @@ df.exp1_long = df.exp1 %>%
 ```{r}
 ######Experiment 1: Causal Rating
 
-
+C1_m0 <- lmer(cause_rating ~ (1|participant), df.exp1_long, REML=F)
 C1_m1 <- lmer(cause_rating ~ agent +(1|participant), df.exp1_long, REML=F)
 C1_m2 <- lmer(cause_rating ~ frequency +(1|participant), df.exp1_long, REML=F)
 C1_m3 <- lmer(cause_rating ~ agent + frequency + (1|participant), df.exp1_long, REML=F)
 C1_m4 <- lmer(cause_rating ~ agent*frequency +(1|participant), df.exp1_long, REML=F)
 C1_m5 <- lmer(cause_rating ~ frequency*agent*scenario +(1|participant), df.exp1_long, REML=F)
 
-##Effect of frequency
-anova(C1_m1,C1_m3)
-r.squaredGLMM(C1_m2) #effect size for full model
-r.squaredGLMM(C1_m3)[2] - r.squaredGLMM(C1_m1)[2] #effect size for factor only
-
 ##Effect of agent
-anova(C1_m2,C1_m3)
+anova(C1_m0,C1_m1)
 r.squaredGLMM(C1_m1) #effect size for full model
-r.squaredGLMM(C1_m3)[2] - r.squaredGLMM(C1_m2)[2] #effect size for factor only
+summary(C1_m1)
+
+##Effect of normality
+anova(C1_m1,C1_m3)
+r.squaredGLMM(C1_m3) #effect size for full model
+summary(C1_m3)
 
 ##Interaction of frequency and agent
 anova(C1_m3,C1_m4)
 r.squaredGLMM(C1_m4)#effect size for full model
-r.squaredGLMM(C1_m4)[2] - r.squaredGLMM(C1_m3)[2]  #effect size for factor only
+summary(C1_m4)
 
 ##Three way interaction with scenario
 anova(C1_m4,C1_m5)
-r.squaredGLMM(C1_m5)#effect size for full model
-r.squaredGLMM(C1_m5)[2] - r.squaredGLMM(C1_m4)[2]#effect size for factor only
 
 ##Test for agents in 'both frequent' condition
 C1_t1 <- lmer(cause_rating ~ (1|participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
@@ -267,20 +269,41 @@ C1_t3 <- lmer(cause_rating ~ (1|participant), data=df.exp1_long[df.exp1_long$fre
 C1_t4 <- lmer(cause_rating ~ agent + (1|participant), df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",])
 anova(C1_t3,C1_t4)
 
-###Observed Power analysis
-powerSim(C1_m5,fixed("agentagent 2", "z"), alpha=0.045, nsim = 50) #Effect "agent"
-powerSim(C1_m5,fixed("frequencyBoth agents frequent", "z"), alpha=0.045, nsim = 50) # Effect "Frequency""
-powerSim(C1_m5,fixed("frequencyBoth agents frequent:agentagent 2", "z"), alpha=0.045, nsim = 50) #Interaction "Frequency x Agent"" 
+
 
 ###Overall analysis
 lmerTest::lmer(cause_rating ~ frequency*agent*scenario + (1 | participant), df.exp1_long)%>% summary()
 
 ```
 
+#####Power Analysis Experiment 1
+```{r}
+
+###Observed Power Analysis for Frequency x Agency Interaction
+doTest(C1_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"))
+powerSim(C1_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"),  nsim = 100) 
+
+###view effect
+fixef(C1_m4)["agentagent 2:frequencyBoth agents frequent"]
+
+
+#### Testing Interaction vs frequency only
+powerSim(C1_m4, nsim=100, test = fcompare(C1_m2))
+
+######Power Curve for Frequency x Agency Interaction
+SCurve1<-powerCurve(C1_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"),
+                    along = "participant",
+                    breaks = c(20,40,60,80),
+                    nsim=100,alpha=.045, progress=FALSE)
+plot(SCurve1)
+summary(SCurve1)
+
+```
+
 # Expectation Judgment
 ```{r}
 #######Experiment 1: Expectation Rating
-
+E1_m0 <- lmer(expect_rating ~ (1|participant), df.exp1_long, REML=F)
 E1_m1 <- lmer(expect_rating ~ agent +(1|participant), df.exp1_long, REML=F)
 E1_m2 <- lmer(expect_rating ~ frequency +(1|participant), df.exp1_long, REML=F)
 E1_m3 <- lmer(expect_rating ~ agent + frequency + (1|participant), df.exp1_long, REML=F)
@@ -288,27 +311,24 @@ E1_m4 <- lmer(expect_rating ~ agent*frequency +(1|participant), df.exp1_long, RE
 E1_m5 <- lmer(expect_rating ~ frequency*agent*scenario +(1|participant), df.exp1_long, REML=F)
 
 ##Effect of agency
-anova(E1_m2,E1_m3)
+anova(E1_m0,E1_m1)
 r.squaredGLMM(E1_m1) #effect size for full model
-r.squaredGLMM(E1_m3)[2] - r.squaredGLMM(E1_m2)[2] #effect size for factor only
+summary(E1_m1)
 
 ##Effect of frequency
 anova(E1_m1,E1_m3)
-r.squaredGLMM(E1_m2)
-r.squaredGLMM(E1_m3)[2] - r.squaredGLMM(E1_m1)[2]
+r.squaredGLMM(E1_m3)#effect size for full model
+summary(E1_m3)
 
 
 ##Interaction of frequency and agent
 anova(E1_m3,E1_m4)
-r.squaredGLMM(E1_m4)
-r.squaredGLMM(E1_m4)[2] - r.squaredGLMM(E1_m3)[2]
+r.squaredGLMM(E1_m4)#effect size for full model
 
 
 ##Interaction scenario x frequency x agent
 anova(E1_m4,E1_m5)
 r.squaredGLMM(E1_m5)
-r.squaredGLMM(E1_m5)[2] - r.squaredGLMM(E1_m4)[2]
-
 
 ##Test for `agent' in 'both frequent' condition
 E1_t1 <- lmer(expect_rating ~ (1|participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
@@ -331,15 +351,36 @@ E1_t6 <- lmer(expect_rating ~ frequency*scenario+
 anova(E1_t5,E1_t6)
 
 
-#####Power Analysis
-powerSim(E1_m5,fixed("agentagent 2", "z"), alpha=0.045, nsim = 50) #Effect "agent"
-powerSim(E1_m5,fixed("frequencyBoth agents frequent", "z"), alpha=0.045, nsim = 50) # Effect "Frequency""
-powerSim(E1_m5,fixed("frequencyBoth agents frequent:agentagent 2", "z"), alpha=0.045, nsim = 50) #Interaction "Frequency x Agent"
-
 ###Overall analysis
 lmerTest::lmer(expect_rating ~ frequency*agent*scenario + (1 | participant), df.exp1_long)%>% summary()
 
 ```
+
+#####Power Analysis Experiment 1
+```{r}
+
+###Observed Power Analysis for Frequency x Agency Interaction
+doTest(E1_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"))
+powerSim(E1_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"),  nsim = 100) 
+
+###view effect
+fixef(E1_m4)["agentagent 2:frequencyBoth agents frequent"]
+
+
+#### Testing Interaction vs frequency only
+powerSim(E1_m4, nsim=100, test = fcompare(E1_m2))
+
+######Power Curve for Frequency x Agency Interaction
+SCurve1<-powerCurve(E1_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"),
+                    along = "participant",
+                    breaks = c(20,40,60,80),
+                    nsim=100,alpha=.045, progress=FALSE)
+plot(SCurve1)
+summary(SCurve1)
+
+```
+
+
 
 ###Descriptives
 
@@ -387,6 +428,7 @@ rm(df.exp1_desc2)
 #### Causal Judgment Plot
 
 #Set theme
+
 myTheme <-   theme(axis.title.x  = element_blank(), 
                    axis.title.y = element_text(color="black", size = 18, vjust=.9), 
                    axis.text.x = element_text(color="black", size = 18),
@@ -405,26 +447,30 @@ ePalette<- c("#969696", "#f7f7f7")
 ecPalette<-c("gray13", "khaki4")
 level_order <- c('Both agents frequent', 'Agent 2 infrequent')
 
+my.labels=c("Agent 1 normal  \nAgent 2 normal","Agent 1 normal\n<br>Agent 2 *abnormal*<br>")
+
 #######
 
 # Causal Judgment Plot
 
-Fig1a <- ggplot(df.exp1_long, aes(x=factor(frequency, levels=level_order), cause_rating, fill=agent)) +
+Fig1a <- df.exp1_long %>% 
+  ggplot(aes(x=factor(frequency, levels=level_order), y=cause_rating, fill=agent)) +
   coord_cartesian(ylim = c(1,7.5)) +
   scale_y_continuous(breaks = seq(0, 7, by=1))+
-  scale_x_discrete(labels=c("Both Agents frequent", "Agent 2 infrequent")) +
   stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.5) +
-  stat_summary( fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
   geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.15), alpha = 
   0.08, colour="black")+
+  scale_x_discrete(labels=my.labels) +
   scale_fill_manual(values=cPalette,  name='Agent', labels=c("Agent 1", "Agent 2"))+
   labs( y="Causal Agreement Rating")+
-  #facet_grid(~scenario, scales="free_x")+
   theme_bw()+
-  myTheme
+  myTheme+
+  theme(axis.text.x = element_markdown())
 
 #Show plot
 plot(Fig1a)
+
 
 # Save plot
 ggsave(Fig1a, file="Fig1a.pdf", dpi=400, height = 6, width = 8)
@@ -447,8 +493,11 @@ Fig1b <- ggplot(df.exp1_long, aes(x=factor(frequency, levels=level_order), expec
   scale_fill_manual(values=ePalette,  name='Agent', labels=c("Agent 1", "Agent 2"))+
   labs( y="Expectation Agreement Rating")+
   #facet_grid(~scenario, scales="free_x")+
+  scale_x_discrete(labels=my.labels) +
   theme_bw()+
-  myTheme
+  myTheme+
+  theme(axis.text.x = element_markdown())
+
 
 #Show plot
 plot(Fig1b)
@@ -629,7 +678,7 @@ df.exp2_long = df.exp2 %>%
 # Causal Judgment
 ```{r}
 #Experiment 2: Causal Rating
-
+C2_m0 <- lmer(cause_rating ~ (1|participant), df.exp2_long, REML=F)
 C2_m1 <- lmer(cause_rating ~ frequency +(1|participant), df.exp2_long, REML=F)
 C2_m2 <- lmer(cause_rating ~ agent +(1|participant), df.exp2_long, REML=F)
 C2_m3 <- lmer(cause_rating ~ agent + frequency +(1|participant), df.exp2_long, REML=F)
@@ -637,37 +686,49 @@ C2_m4 <- lmer(cause_rating ~ agent*frequency +(1|participant), df.exp2_long, REM
 C2_m5 <- lmer(cause_rating ~ frequency*agent*scenario +(1|participant), df.exp2_long, REML=F)
 
 ##Effect of agent
-anova(C2_m1,C2_m3)
-r.squaredGLMM(C2_m2)
-r.squaredGLMM(C2_m3)[2] - r.squaredGLMM(C2_m1)[2]
+anova(C2_m0,C2_m2)
 
 ##Effect of frequency
 anova(C2_m2,C2_m3)
-r.squaredGLMM(C2_m1)
-r.squaredGLMM(C2_m3)[2] - r.squaredGLMM(C2_m2)[2]
 
 ##Interaction of frequency and agent
 anova(C2_m3,C2_m4)
-r.squaredGLMM(C2_m2)
-r.squaredGLMM(C2_m3)[2] - r.squaredGLMM(C2_m1)[2]
 
 ##Three way interaction scenario x frequency x agent
 anova(C2_m4,C2_m5)
-r.squaredGLMM(C2_m4)
-r.squaredGLMM(C2_m4)[2] - r.squaredGLMM(C2_m3)[2]
 
-####Power Analysis
-#f2 obtained from Rc2 in Experiment 1
-pwr.f2.test(u = 2, v = 130 - 2 - 1, f2 = .07/(1 - .07), sig.level = 0.05)
 
 ###Overall analysis
 lmerTest::lmer(cause_rating ~ frequency*agent*scenario + (1 | participant), df.exp2_long)%>% summary()
 
 ```
+
+#####Power Analysis Experiment 2 - Causal Judgments
+```{r}
+
+###Observed Power Analysis for Frequency x Agency Interaction --- n.s.
+doTest(C2_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"))
+
+###add effect size from Experiment 1
+fixef(C2_m4)["agentagent 2:frequencyBoth agents frequent"]<- -1.8
+
+
+###test for previous effect size
+powerSim(C2_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"),  nsim = 100) 
+
+
+#### Testing Interaction vs frequency only
+powerSim(C2_m4, nsim=100, test = fcompare(C2_m2))
+
+
+```
+
+
+
 #Execptation Judgment
 ```{r}
 #Experiment 2: Expectation Rating
-
+E2_m0 <- lmer(expect_rating ~ (1|participant), df.exp2_long, REML=F)
 E2_m1 <- lmer(expect_rating ~ frequency +(1|participant), df.exp2_long, REML=F)
 E2_m2 <- lmer(expect_rating ~ agent +(1|participant), df.exp2_long, REML=F)
 E2_m3 <- lmer(expect_rating ~ agent + frequency +(1|participant), df.exp2_long, REML=F)
@@ -675,25 +736,23 @@ E2_m4 <- lmer(expect_rating ~ agent*frequency +(1|participant), df.exp2_long, RE
 E2_m5 <- lmer(expect_rating ~ agent*frequency*scenario +(1|participant), df.exp2_long, REML=F)
 
 ##Effect of agent
-anova(E2_m1,E2_m3)
+anova(E2_m0,E2_m2)
 r.squaredGLMM(E2_m2)
-r.squaredGLMM(E2_m3)[2] - r.squaredGLMM(E2_m1)[2]
+summary(E2_m2)
 
 ##Effect of frequency
 anova(E2_m2,E2_m3)
-r.squaredGLMM(E2_m1)
-r.squaredGLMM(E2_m3)[2] - r.squaredGLMM(E2_m2)[2]
-
+r.squaredGLMM(E2_m3)
+summary(E2_m3)
 
 ##Interaction of frequency and agent
 anova(E2_m3,E2_m4)
 r.squaredGLMM(E2_m4)
-r.squaredGLMM(E2_m4)[2] - r.squaredGLMM(E2_m3)[2]
+summary(E2_m4)
 
 ##Three-way interaction frequency x agents x scenario
 anova(E2_m4,E2_m5)
-r.squaredGLMM(E2_m4)
-r.squaredGLMM(E2_m4)[2] - r.squaredGLMM(E2_m3)[2]
+r.squaredGLMM(E2_m5)
 
 ##Test for agents in 'one frequent' condition
 E2_t3 <- lmer(expect_rating ~ (1|participant), data=df.exp2_long[df.exp2_long$frequency=="Agent 2 infrequent",], REML=F)
@@ -711,14 +770,31 @@ E2_t6 <- lmer(expect_rating ~ scenario+
 anova(E2_t5,E2_t6)
 
 
-####Power Analysis
-#f2 obtained from Exp 1
-pwr.f2.test(u = 2, v = 130 - 2 - 1, f2 = 0.12/(1 - 0.12), sig.level = 0.05)
-
 ###Overall analysis
 lmerTest::lmer(expect_rating ~ frequency*agent*scenario + (1 | participant), df.exp2_long)%>% summary()
 
 ```
+
+#####Power Analysis Experiment 2 - Expectation Judgments
+```{r}
+
+###Observed Power Analysis for Frequency x Agency Interaction 
+doTest(E2_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"))
+
+###add effect size from Experiment 1
+fixef(E2_m4)["agentagent 2:frequencyBoth agents frequent"]<- -2.5
+
+
+###test for previous effect size
+powerSim(E2_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"),  nsim = 100) 
+
+
+#### Testing Interaction vs frequency only
+powerSim(E2_m4, nsim=100, test = fcompare(C2_m2))
+
+
+```
+
 
 ###Descriptives
 ```{r}
@@ -782,12 +858,14 @@ cPalette <- c("#333300", "#CCCC99")
 ePalette<- c("#969696", "#f7f7f7")
 level_order <- c('Both agents frequent', 'Agent 2 infrequent')
 
+my.labels=c("Agent 1 normal  \nAgent 2 normal","Agent 1 normal\n<br>Agent 2 *abnormal*<br>")
+
 
 #Create Plot
 Fig2a <- ggplot(df.exp2_long, aes(x=factor(frequency, levels=level_order), cause_rating, fill=agent)) +
   coord_cartesian(ylim = c(1,7.5)) +
   scale_y_continuous(breaks = seq(0, 7, by=1))+
-  scale_x_discrete(labels=c("Both Agents frequent", "Agent 2 infrequent")) +
+  scale_x_discrete(labels=my.labels) +
   stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
   stat_summary(fun.data= mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
   geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.15), alpha =  0.08,   
@@ -796,7 +874,9 @@ Fig2a <- ggplot(df.exp2_long, aes(x=factor(frequency, levels=level_order), cause
   labs( y="Causal Agreement Rating")+
   #facet_grid(~scenario, scales="free_x")+
   theme_bw()+
-  myTheme
+  myTheme+
+  theme(axis.text.x = element_markdown())
+
 
 #Show plot
 plot(Fig2a)
@@ -807,15 +887,15 @@ ggsave(Fig2a, file="Fig2a.pdf", dpi=400, height = 6, width = 8)
 ```
 
 ###Plot
-#Expectation Judgmet
+#Expectation Judgment
 ```{r}
 
 #Create plot
 Fig2b <- ggplot(df.exp2_long, aes(x=factor(frequency, levels=level_order), expect_rating, fill=agent)) +
   coord_cartesian(ylim = c(1,7.5)) +
   scale_y_continuous(breaks = seq(1, 7, by=1))+
-  scale_x_discrete(labels=c("Both Agents frequent", "Agent 2 infrequent")) +
   stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
+  scale_x_discrete(labels=my.labels) +
   stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) +
   geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.15), alpha = 
   0.08, colour = "black")+
@@ -823,7 +903,9 @@ Fig2b <- ggplot(df.exp2_long, aes(x=factor(frequency, levels=level_order), expec
   labs( y="Expectation Agreement Rating")+
   #facet_grid(~scenario, scales="free_x")+
   theme_bw()+
-  myTheme
+  myTheme+
+  theme(axis.text.x = element_markdown())
+
 
 #Show plot
 plot(Fig2b)
@@ -991,7 +1073,7 @@ df.exp3_long = df.exp3 %>%
   mutate(knowledge = ifelse(str_detect(condition, "one"),
                         "Knowledge", "No Knowledge")) %>% 
   mutate(agent = ifelse(str_detect(condition, "_a1"),
-                        "Normal Agent", "Abnormal Agent")) %>% 
+                        "Agent 1: normal", "Agent 2: abnormal")) %>% 
   mutate(rating=as.numeric(rating)) %>% 
   select(-condition) %>% 
   spread(type, rating) 
@@ -1004,7 +1086,7 @@ df.exp3_long = df.exp3 %>%
 
 ```{r}
 #Experiment 3: Expectation Rating
-
+E3_m0 <- lmer(expect_rating ~ (1|participant), df.exp3_long, REML=F)
 E3_m1 <- lmer(expect_rating ~ agent +(1|participant), df.exp3_long, REML=F)
 E3_m2 <- lmer(expect_rating ~ knowledge +(1|participant), df.exp3_long, REML=F)
 E3_m3 <- lmer(expect_rating ~ agent + knowledge +(1|participant), df.exp3_long, REML=F)
@@ -1012,20 +1094,20 @@ E3_m4 <- lmer(expect_rating ~ agent*knowledge +(1|participant), df.exp3_long, RE
 E3_m5 <- lmer(expect_rating ~ agent*knowledge*scenario +(1|participant), df.exp3_long, REML=F)
 
 ##Effect of agent
-anova(E3_m2,E3_m3)
-r.squaredGLMM(E3_m3)[2] - r.squaredGLMM(E3_m2)[2]
+anova(E3_m0,E3_m1)
+r.squaredGLMM(E3_m1)
 
 ##Effect of knowledge
 anova(E3_m1,E3_m3)
-r.squaredGLMM(E3_m3)[2] - r.squaredGLMM(E3_m1)[2]
+r.squaredGLMM(E3_m3)
 
 ##Interaction of knowledge and agent
 anova(E3_m3,E3_m4)
-r.squaredGLMM(E3_m4)[2] - r.squaredGLMM(E3_m3)[2]
+summary(E3_m4)
 
 ##... interaction with scenario
 anova(E3_m5,E3_m4)
-r.squaredGLMM(E3_m4)[2] - r.squaredGLMM(E3_m3)[2]
+r.squaredGLMM(E3_m4)
 
 
 ##Test for agent in 'knowlege' condition
@@ -1038,19 +1120,42 @@ E3_t5 <- lmer(expect_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$kn
 E3_t6 <- lmer(expect_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
 anova(E3_t5,E3_t6)
 
-###Power analysis
-powerSim(E3_m5,fixed("agentNormal Agent", "z"), alpha=0.045, nsim = 50) #Effect "agent"
-powerSim(E3_m5,fixed("knowledgeNo Knowledge", "z"), alpha=0.045, nsim = 50) # Effect "Knowledge""
-powerSim(E3_m5,fixed("agentNormal Agent:knowledgeNo Knowledge", "z"), alpha=0.045, nsim = 50) #Interaction "Knowledge x Agent" 
+ 
 ###Primary analysis
 lmerTest::lmer(expect_rating ~ agent*knowledge*scenario + (1 | participant), df.exp3_long)%>% summary()
 ```
+
+#####Power Analysis Experiment 3 - Expectation Ratings
+```{r}
+
+###Observed Power Analysis for Normality x Knowledge Interaction
+doTest(E3_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"))
+powerSim(E3_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"),  nsim = 100) 
+
+###view effect
+fixef(E3_m4)["agentAgent 2: abnormal:knowledgeNo Knowledge"]
+
+
+#### Testing Interaction vs knowledge only
+powerSim(E3_m4, nsim=100, test = fcompare(E3_m2))
+
+######Power Curve for Normality x Knowledge Interaction
+SCurve1<-powerCurve(E3_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"),
+                    along = "participant",
+                    breaks = c(20,40,60,80),
+                    nsim=100,alpha=.045, progress=FALSE)
+plot(SCurve1)
+summary(SCurve1)
+
+```
+
+
 
 #Causal Judgment
 ```{r}
 
 #Experiment 3: Causal Rating
-
+C3_m0 <- lmer(cause_rating ~ (1|participant), df.exp3_long, REML=F)
 C3_m1 <- lmer(cause_rating ~ agent +(1|participant), df.exp3_long, REML=F)
 C3_m2 <- lmer(cause_rating ~ knowledge +(1|participant), df.exp3_long, REML=F)
 C3_m3 <- lmer(cause_rating ~ agent + knowledge +(1|participant), df.exp3_long, REML=F)
@@ -1058,16 +1163,16 @@ C3_m4 <- lmer(cause_rating ~ agent*knowledge +(1|participant), df.exp3_long, REM
 C3_m5 <- lmer(cause_rating ~ knowledge*agent*scenario +(1|participant), df.exp3_long, REML=F)
 
 ##Effect of agent
-anova(C3_m2,C3_m3)
-r.squaredGLMM(C3_m3)[2] - r.squaredGLMM(C3_m2)[2]
+anova(C3_m0,C3_m1)
+r.squaredGLMM(C3_m1)
 
 ##Effect of knowledge
 anova(C3_m1,C3_m3)
-r.squaredGLMM(C3_m3)[2] - r.squaredGLMM(C3_m1)[2]
+r.squaredGLMM(C3_m3)
 
 ##Interaction of knowledge and agent
 anova(C3_m3,C3_m4)
-r.squaredGLMM(C3_m4)[2] - r.squaredGLMM(C3_m3)[2]
+r.squaredGLMM(C3_m4)
 
 ##Test for agent in 'knowlege' condition
 C3_t3 <- lmer(cause_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
@@ -1081,16 +1186,37 @@ anova(C3_t5,C3_t6)
 
 ##Three way interaction with scenario
 anova(C3_m4,C3_m5)
-r.squaredGLMM(C3_m5)[2] - r.squaredGLMM(C3_m4)[2]
 
-###Power analysis
-powerSim(C3_m5,fixed("agentNormal Agent", "z"), alpha=0.045, nsim = 50) #Effect "agent"
-powerSim(C3_m5,fixed("agentNormal Agent:knowledgeNo Knowledge", "z"), alpha=0.045, nsim = 50) #Interaction "Knowledge x Agent"
 
 ###Overall analysis
 lmerTest::lmer(cause_rating ~ knowledge*agent*scenario + (1 | participant), df.exp3_long)%>% summary()
 
 ```
+
+#####Power Analysis Experiment 3 - Causal Judgments
+```{r}
+
+###Observed Power Analysis for Normality x Agency Interaction
+doTest(C3_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"))
+powerSim(C3_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"),  nsim = 100) 
+
+###view effect
+fixef(C3_m4)["agentAgent 2: abnormal:knowledgeNo Knowledge"]
+
+
+#### Testing Interaction vs Knowledge only
+powerSim(C3_m4, nsim=100, test = fcompare(C3_m2))
+
+######Power Curve for Normality x Agent Interaction
+SCurve1<-powerCurve(C3_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"),
+                    along = "participant",
+                    breaks = c(20,40,60,80),
+                    nsim=100,alpha=.045, progress=FALSE)
+plot(SCurve1)
+summary(SCurve1)
+
+```
+
 
 ### Descriptives
 ```{r}
@@ -1134,13 +1260,12 @@ rm(df.exp3_desc2)
 
 df.exp3_long2<-df.exp3_long %>% 
 gather(ratingtype, rating, cause_rating:expect_rating) %>% 
-df.exp3_long2 %>% 
  mutate(color = interaction(ratingtype, agent, sep=".")) %>% 
- mutate(agent =factor(agent,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+ mutate(agent =factor(agent,levels=c( "Agent 1: normal", "Agent 2: abnormal"))) %>% 
  mutate(ratingtype =factor(ratingtype,levels=c( "expect_rating", "cause_rating"))) %>% 
  mutate(ratingtype =recode(ratingtype,
-                            "expect_rating"= "Expectation Rating",
-                            "cause_rating"= "Causal Rating"))
+                            "expect_rating"= "Expectation",
+                            "cause_rating"= "Causation"))
 
 ```
 
@@ -1158,7 +1283,7 @@ myTheme <-   theme(plot.title=element_text(size=18,
                                     lineheight=1.2),
                    axis.title.x  = element_blank(), 
                    axis.title.y = element_text(color="black", size = 18, vjust=.9), 
-                   axis.text.x =  element_text(color="black", size = 16, vjust=.9),
+                   axis.text.x =  element_text(color="black", size = 15, vjust=.9),
                    axis.text.y = element_text(color="black", size = 18), 
                    strip.text.x = element_text(color="black", size = 16),
                    legend.text = element_text(color="black", size = 18),
@@ -1179,13 +1304,13 @@ Knowledge <- df.exp3_long2 %>%
   ggplot(aes(x=agent, y=rating, fill=color)) +
   coord_cartesian(ylim = c(1,7.5)) +
   scale_y_continuous(breaks = seq(0, 7, by=1))+
-  scale_x_discrete(labels=c("Normal Agent", "Abnormal Agent")) +
+  scale_x_discrete(labels=c("Agent 1: normal", "Agent 2: abnormal")) +
   stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
   stat_summary(fun.data= mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.1) +
   geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.7), alpha = 
   0.08, colour = "black")+
   facet_grid(.~ratingtype, scales = "free")+
-  scale_fill_manual(values=Palette, labels=c("Normal Agent", "Abnormal Agent", "Normal Agent", "Abnormal Agent"))+
+  scale_fill_manual(values=Palette, labels=c("Agent 1: normal", "Agent 2: abnormal", "Agent 1: normal", "Agent 2: abnormal"))+
   labs( y="Agreement Rating")+
   theme_bw()+
   myTheme+
@@ -1202,13 +1327,13 @@ NoKnowledge <- df.exp3_long2 %>%
   ggplot(aes(x=agent, y=rating, fill=color)) +
   coord_cartesian(ylim = c(1,7.5)) +
   scale_y_continuous(breaks = seq(0, 7, by=1))+
-  scale_x_discrete(labels=c("Normal Agent", "Abnormal Agent")) +
+  scale_x_discrete(labels=c("Agent 1: normal", "Agent 2: abnormal")) +
   stat_summary(fun.y = mean, geom = "bar", position = "dodge", colour = "black", alpha=0.6) +
   stat_summary(fun.data= mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.1) +
   geom_jitter(position = position_jitterdodge(jitter.height = 0.2, dodge.width = 0.90, jitter.width=0.7), alpha =  0.08,   
   colour= "black")+
   facet_grid(.~ratingtype, scales = "free")+
-  scale_fill_manual(values=Palette, name='Agent', labels=c("Normal Agent", "Abnormal Agent", "Normal Agent", "Abnormal Agent"))+
+  scale_fill_manual(values=Palette, name='Agent', labels=c("Agent 1: normal", "Agent 2: abnormal", "Agent 1: normal", "Agent 2: abnormal"))+
   labs( y="Agreement Rating")+
   theme_bw()+
   myTheme+
@@ -1295,7 +1420,7 @@ cpt = list(NormalityA = NormalityA.prob,
 survey = custom.fit(dag, cpt)
 
 ### plot model
-graphviz.plot(dag)
+graphviz.plot(dag,shape = "ellipse")
 
 ```
 
@@ -1334,7 +1459,7 @@ E_Normal<-cpquery(survey, event = (AexpectsB == "T"), evidence = (NormalityA == 
 #create dataframe with cpqs
 ```{r}
 
-df.Knowledge<-data.frame(Prediction=c(M_Abnormal, M_Normal, E_Abnormal, E_Normal), Condition=c("Abnormal Agent", "Normal Agent", "Abnormal Agent", "Normal Agent"), InferenceType=c("Mental State", "Mental State", "Expectation about other agent", "Expectation about other agent")) %>% 
+df.Knowledge<-data.frame(Prediction=c(M_Abnormal, M_Normal, E_Abnormal, E_Normal), Condition=c("Agent 2: abnormal", "Agent 1: normal", "Agent 2: abnormal", "Agent 1: normal"), InferenceType=c("Mental State", "Mental State", "Expectation about other agent", "Expectation about other agent")) %>% 
   mutate(Prediction = round(Prediction, digits=2)) %>% 
   mutate(Knowledge = "Knowledge")
 
@@ -1352,7 +1477,7 @@ myTheme <-   theme(plot.title=element_text(size=18,
                                     lineheight=1.2),
                    axis.title.x  = element_blank(), 
                    axis.title.y = element_text(color="black", size = 18, vjust=.9), 
-                   axis.text.x = element_text(color="black", size = 16),
+                   axis.text.x = element_text(color="black", size = 14),
                    axis.text.y = element_text(color="black", size = 18), 
                    strip.text.x = element_text(color="black", size = 16),
                    legend.text = element_text(color="black", size = 18),
@@ -1367,7 +1492,7 @@ ecPalette<-c("gray13", "khaki4")
 
 #create plot
 FigXa <-df.Knowledge %>% 
-  mutate(Condition =factor(Condition,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+  mutate(Condition =factor(Condition,levels=c("Agent 1: normal", "Agent 2: abnormal"))) %>% 
   ggplot(aes(x=factor(Condition), Prediction, fill=Condition)) +
   geom_bar(stat="identity", position = "dodge", colour = "black", alpha=0.6)+
   coord_cartesian(ylim = c(0,1.1)) +
@@ -1431,7 +1556,7 @@ cpt2 = list(NormalityA = NormalityA.prob,
 survey2 = custom.fit(dag2, cpt2)
 
 # plot model
-graphviz.plot(dag2)
+graphviz.plot(dag2,shape = "ellipse")
 
 ```
 
@@ -1469,7 +1594,7 @@ E_Normal2<-cpquery(survey2, event = (AexpectsB == "T"), evidence = (NormalityA =
 
 ```{r}
 
-df.NoKnowledge<-data.frame(Prediction=c(M_Abnormal2, M_Normal2, E_Abnormal2, E_Normal2), Condition=c("Abnormal Agent", "Normal Agent", "Abnormal Agent", "Normal Agent"), InferenceType=c("Mental State", "Mental State", "Expectation about other agent", "Expectation about other agent")) %>% 
+df.NoKnowledge<-data.frame(Prediction=c(M_Abnormal2, M_Normal2, E_Abnormal2, E_Normal2), Condition=c("Agent 2: abnormal", "Agent 1: normal", "Agent 2: abnormal", "Agent 1: normal"), InferenceType=c("Mental State", "Mental State", "Expectation about other agent", "Expectation about other agent")) %>% 
   mutate(Prediction = round(Prediction, digits=2)) %>% 
   mutate(Knowledge="No Knowledge")
 
@@ -1485,7 +1610,7 @@ myTheme <-   theme(plot.title=element_text(size=18,
                                     lineheight=1.2),
                    axis.title.x  = element_blank(), 
                    axis.title.y = element_text(color="black", size = 18, vjust=.9), 
-                   axis.text.x = element_text(color="black", size = 16),
+                   axis.text.x = element_text(color="black", size = 14),
                    axis.text.y = element_text(color="black", size = 18), 
                    strip.text.x = element_text(color="black", size = 16),
                    legend.text = element_text(color="black", size = 18),
@@ -1500,11 +1625,11 @@ ePalette<- c("#969696", "#f7f7f7")
 
 #create plot
 FigXb <- df.NoKnowledge %>% 
-  mutate(Condition =factor(Condition,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+  mutate(Condition =factor(Condition,levels=c("Agent 1: normal", "Agent 2: abnormal"))) %>% 
   ggplot(aes(x=factor(Condition), Prediction, fill=Condition)) +
   geom_bar(stat="identity", position = "dodge", colour = "black", alpha=0.6)+
   coord_cartesian(ylim = c(0,1.1)) +
-  geom_text(aes(label=scales::percent(Prediction, accuracy = 1)),  vjust=-0.6, color="black", size=6)+
+  geom_text(aes(label=scales::percent(Prediction, accuracy = 1)), size=6, vjust=-0.6, color="black")+
   labs( y="Probablity")+
   scale_y_continuous(labels =scales::percent_format(accuracy = 1), breaks = seq(0, 1, by=0.25))+
   scale_fill_manual(values = ePalette)+
@@ -1531,6 +1656,8 @@ plot(FigX)
 
 #save plot
 ggsave(FigX, file="FigX.pdf", dpi=400, height = 8, width = 8)
+ggsave(FigX, file="FigX.jpeg", dpi=400, height = 8, width = 8)
+
 ```
 
 # Experiment 4:
@@ -1757,7 +1884,7 @@ df.exp4_long = df.exp4 %>%
   mutate(knowledge = ifelse(str_detect(condition, "know"),
                         "Knowledge", "No Knowledge")) %>% 
   mutate(agent = ifelse(str_detect(condition, "_a1"),
-                        "Normal Agent", "Abnormal Agent")) %>% 
+                        "Agent 1: normal", "Agent 2: abnormal")) %>% 
   mutate(rating=as.numeric(rating)) %>% 
   select(-condition) %>% 
   spread(type, rating) %>% 
@@ -1774,7 +1901,7 @@ df.exp4_long = df.exp4 %>%
 #Experiment 4: 
 # 1) Expectation about other agents
 
-
+E4_m0 <- lmer(exp_other ~ (1|participant), df.exp4_long, REML=F)
 E4_m1 <- lmer(exp_other ~ agent +(1|participant), df.exp4_long, REML=F)
 E4_m2 <- lmer(exp_other ~ knowledge +(1|participant), df.exp4_long, REML=F)
 E4_m3 <- lmer(exp_other ~ agent + knowledge +(1|participant), df.exp4_long, REML=F)
@@ -1782,16 +1909,16 @@ E4_m4 <- lmer(exp_other ~ agent*knowledge +(1|participant), df.exp4_long, REML=F
 E4_m5 <- lmer(exp_other ~ knowledge*agent*scenario +(1|participant), df.exp4_long, REML=F)
 
 ##Effect of Agent
-anova(E4_m2,E4_m3)
-r.squaredGLMM(E4_m3)[1] - r.squaredGLMM(E4_m2)[1]
+anova(E4_m0,E4_m1)
+r.squaredGLMM(E4_m1)
 
 ##Effect of Knowledge
 anova(E4_m1,E4_m3)
-r.squaredGLMM(E4_m3)[1] - r.squaredGLMM(E4_m1)[1]
+r.squaredGLMM(E4_m3)
 
 ##Interaction of knowledge and agent
 anova(E4_m3,E4_m4)
-r.squaredGLMM(E4_m4)[1] - r.squaredGLMM(E4_m3)[1]
+r.squaredGLMM(E4_m4)
 
 ##Three way interaction scenario x knowledge x agent
 anova(E4_m4,E4_m5)
@@ -1807,40 +1934,60 @@ E4_t4 <- lmer(exp_other ~ agent + (1|participant), df.exp4_long[df.exp4_long$kno
 anova(E4_t3,E4_t4)
 
 ###Overall analysis
-lmerTest::lmer(exp_other ~ knowledge*agent*scenario + (1 | participant), df.exp4_long)%>% summary()
+lmerTest::lmer(exp_other ~ agent*knowledge*scenario + (1 | participant), df.exp4_long)%>% summary()
 
 ```
+
+#####Power Analysis Experiment 4 - Expectation about each other Judgments
+```{r}
+
+###Observed Power Analysis for Frequency x Agency Interaction 
+doTest(E4_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"))
+
+###add effect size from Experiment 3
+fixef(E4_m4)["agentAgent 2: abnormal:knowledgeNo Knowledge"]<- -4.2
+
+###test for previous effect size
+powerSim(E4_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"),  nsim = 100) 
+
+
+#### Testing Interaction vs Knowledge only
+powerSim(E4_m4, nsim=100, test = fcompare(E4_m4_m2))
+
+
+```
+
 
 ###Data analysis
 #Expectation about outcome judgment
 
 ```{r}
-
 ###Experiment 4: 
 # 2) Expectation about the outcome
 
 ### Test Fixed Effects
+Ex4_m0 <- lmer(exp_outcome ~ (1|participant), df.exp4_long, REML=F)
 Ex4_m1 <- lmer(exp_outcome ~ agent +(1|participant), df.exp4_long, REML=F)
 Ex4_m2 <- lmer(exp_outcome ~ knowledge +(1|participant), df.exp4_long, REML=F)
 Ex4_m3 <- lmer(exp_outcome ~ agent + knowledge +(1|participant), df.exp4_long, REML=F)
 Ex4_m4 <- lmer(exp_outcome ~ agent*knowledge +(1|participant), df.exp4_long, REML=F)
 Ex4_m5 <- lmer(exp_outcome ~ knowledge*agent*scenario +(1|participant), df.exp4_long, REML=F)
 
+##Effect of Agent
+anova(Ex4_m0,Ex4_m1)
+r.squaredGLMM(Ex4_m1)
+
 ##Effect of Knowledge
 anova(Ex4_m1,Ex4_m3)
-r.squaredGLMM(Ex4_m3)[1] - r.squaredGLMM(Ex4_m1)[1]
-
-##Effect of Agent
-anova(Ex4_m3,Ex4_m2)
-r.squaredGLMM(Ex4_m3)[1] - r.squaredGLMM(Ex4_m2)[1]
+r.squaredGLMM(Ex4_m3)
 
 ##Interaction of knowledge and agent
-anova(Ex4_m4,Ex4_m3)
-r.squaredGLMM(Ex4_m4)[1] - r.squaredGLMM(Ex4_m3)[1]
+anova(Ex4_m3,Ex4_m4)
+r.squaredGLMM(Ex4_m4)
 
 ##Three way interaction scenario x knowledge x agent
-anova(Ex4_m5,Ex4_m4)
-r.squaredGLMM(Ex4_m5)[1] - r.squaredGLMM(Ex4_m4)[1]
+anova(Ex4_m4,Ex4_m5)
+r.squaredGLMM(Ex4_m5)
 
 
 #Test for agents in 'Knowledge' condition
@@ -1881,27 +2028,27 @@ lmerTest::lmer(exp_outcome ~ knowledge*agent*scenario + (1 | participant), df.ex
 #Experiment 4
 # 3) Mental State Attribution
 
+M4_m0 <- lmer(mental_state ~ (1|participant), df.exp4_long, REML=F)
 M4_m1 <- lmer(mental_state ~ agent +(1|participant), df.exp4_long, REML=F)
 M4_m2 <- lmer(mental_state ~ knowledge +(1|participant), df.exp4_long, REML=F)
 M4_m3 <- lmer(mental_state ~ agent + knowledge +(1|participant), df.exp4_long, REML=F)
 M4_m4 <- lmer(mental_state ~ agent*knowledge +(1|participant), df.exp4_long, REML=F)
 M4_m5 <- lmer(mental_state ~ knowledge*agent*scenario +(1|participant), df.exp4_long, REML=F)
 
+##Effect of Agent
+anova(M4_m0,M4_m1)
+r.squaredGLMM(M4_m1)
+
 ##Effect of Knowledge
 anova(M4_m1,M4_m3)
-r.squaredGLMM(M4_m3)[1] - r.squaredGLMM(M4_m1)[1]
-
-##Effect of Agent
-anova(M4_m3,M4_m2)
-r.squaredGLMM(M4_m3)[1] - r.squaredGLMM(M4_m2)[1]
+r.squaredGLMM(M4_m3)
 
 ##Interaction of knowledge and agent
 anova(M4_m3,M4_m4)
-r.squaredGLMM(M4_m4)[1] - r.squaredGLMM(M4_m3)[1]
+r.squaredGLMM(M4_m4)
 
 ##Three way interaction with scenario
 anova(M4_m5,M4_m4)
-r.squaredGLMM(M4_m5)[1] - r.squaredGLMM(M4_m4)[1]
 
 #Test for agents in 'Knowledge' condition
 M4_t1 <- lmer(mental_state ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
@@ -1984,7 +2131,7 @@ Fig4a <- df.exp4_long %>%
   mutate(ep_state=recode(ep_state,"exp_other"="Expectation about other agent",
                           "exp_outcome"="Expectation of outcome"))%>% 
   rename(Agent = agent) %>% 
-  mutate(Agent =factor(Agent,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+  mutate(Agent =factor(Agent,levels=c( "Agent 1: normal", "Agent 2: abnormal"))) %>% 
   ggplot(aes(x=knowledge, y=ep_rating, fill=Agent)) +
   coord_cartesian(ylim = c(1,7.5)) +
   scale_y_continuous(breaks = seq(0, 7, by=1))+
@@ -2021,7 +2168,7 @@ Fig4b <- df.exp4_long %>%
            -exp_outcome) %>% 
   mutate(mental_state=factor(mental_state,levels=c("indifferent", "like", "desire", "intend"))) %>%
   rename(Agent = agent) %>% 
-  mutate(Agent =factor(Agent,levels=c( "Normal Agent", "Abnormal Agent"))) %>% 
+  mutate(Agent =factor(Agent,levels=c("Agent 1: normal", "Agent 2: abnormal"))) %>% 
   ggplot(aes(x=knowledge, y=mental_rating, fill=Agent)) +
   coord_cartesian(ylim = c(1,7.5)) +
   scale_y_continuous(breaks = seq(0, 7, by=1))+
