@@ -1,0 +1,309 @@
+---
+title: "Bayesian Network"
+output: html_document
+---
+
+###### Bayesian Network model
+
+####Load relevant packages
+
+```{r}
+install.packages("bnlearn")
+install.packages("Rgraphviz")
+install.packages("bnviewer")
+```
+
+```{r}
+library("bnlearn")
+library("Rgraphviz")
+library("bnviewer")
+```
+
+###Bayesian Network Model
+# Version `Knowledge' 
+```{r}
+######Bayesian Model Part
+#Model 1: Knowledge about each other
+
+
+###Graph Structure
+
+dag = model2network("[NormalityA][NormalityB][AexpectsB|NormalityB][BexpectsA|NormalityA][MentalStateA][MentalStateB][ActionA|NormalityA:AexpectsB:MentalStateA][ActionB|NormalityB:BexpectsA:MentalStateB][Outcome|ActionA:ActionB]")
+
+###Variables
+
+NormalityA.lv = c("F", "T")
+NormalityB.lv = c("F", "T")
+AexpectsB.lv = c("F", "T")
+BexpectsA.lv = c("F", "T")
+MentalStateA.lv = c("F", "T")
+MentalStateB.lv = c("F", "T")
+ActionA.lv = c("F", "T")
+ActionB.lv = c("F", "T")
+Outcome.lv = c("F", "T")
+
+###Conditional Probablities
+
+NormalityA.prob = array(c(0.2, 0.8), dim = 2, dimnames = list(NormalityA = NormalityA.lv))
+NormalityB.prob = array(c(0.2, 0.8), dim = 2, dimnames = list(NormalityB = NormalityB.lv))
+AexpectsB.prob = array(c(0.9, 0.1, 0.1, 0.9), dim = c(2,2), dimnames = list(AexpectsB = AexpectsB.lv, NormalityB= NormalityB.lv))
+BexpectsA.prob = array(c(0.9, 0.1, 0.1, 0.9), dim = c(2,2), dimnames = list(BexpectsA = BexpectsA.lv, NormalityA= NormalityA.lv))
+MentalStateA.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(MentalStateA = MentalStateA.lv))
+MentalStateB.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(MentalStateB = MentalStateB.lv))
+ActionA.prob = array(c(0.8, 0.2, 0.9,0.1, 0.8, 0.2,0.1,0.9,0.2,0.8,0.9,0.1, 0.2, 0.8, 0.1,0.9), dim = c(2, 2, 2, 2), dimnames = list(ActionA=ActionA.lv, AexpectsB = AexpectsB.lv, MentalStateA = MentalStateA.lv, NormalityA = NormalityA.lv))
+ActionB.prob = array(c(0.8, 0.2, 0.9,0.1, 0.8, 0.2,0.1,0.9,0.2,0.8,0.9,0.1, 0.2, 0.8, 0.1,0.9), dim = c(2, 2, 2, 2), dimnames = list(ActionB=ActionB.lv, BexpectsA = BexpectsA.lv, MentalStateB = MentalStateB.lv, NormalityB = NormalityB.lv))
+Outcome.prob = array(c(1, 0, 1, 0, 1, 0, 0, 1), dim = c(2,2, 2), dimnames = list(Outcome = Outcome.lv, ActionA=ActionA.lv, ActionB=ActionB.lv))
+
+cpt = list(NormalityA = NormalityA.prob, 
+             NormalityB = NormalityB.prob,
+             AexpectsB = AexpectsB.prob,
+             BexpectsA = BexpectsA.prob,
+             MentalStateA=MentalStateA.prob,
+             MentalStateB=MentalStateB.prob,
+             ActionA=ActionA.prob,
+             ActionB=ActionB.prob,
+             Outcome=Outcome.prob)
+      
+###set up model        
+survey = custom.fit(dag, cpt)
+
+### plot model
+graphviz.plot(dag,shape = "ellipse")
+
+```
+
+#Estimation of Conditional Probablity for mental state
+```{r}
+#############Mental State
+
+##### Mental State for Abnormal Agent
+## mental state true
+M_Abnormal<-cpquery(survey, event = (MentalStateB == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") &(ActionB == "T") &(Outcome == "T"), n=10000000 )
+
+
+#### Mental State for Normal Agent
+## mental state true
+M_Normal<-cpquery(survey, event = (MentalStateA == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") , n=10000000 )
+
+```
+
+#Estimation of Conditional Probablity for epistemic state
+```{r}
+#############Epistemic State
+
+##### Epistemic State for Abnormal Agent
+## epistemic  state true
+E_Abnormal<-cpquery(survey, event = (BexpectsA == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") &(Outcome == "T"), n=10000000 )
+
+#### Epistemic State for Normal Agent
+## epistemic  state true
+E_Normal<-cpquery(survey, event = (AexpectsB == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") , n=10000000 )
+```
+
+#create dataframe with cpqs
+```{r}
+
+df.Knowledge<-data.frame(Prediction=c(M_Abnormal, M_Normal, E_Abnormal, E_Normal), Condition=c("Agent 2: abnormal", "Agent 1: normal", "Agent 2: abnormal", "Agent 1: normal"), InferenceType=c("Mental State", "Mental State", "Expectation about other agent", "Expectation about other agent")) %>% 
+  mutate(Prediction = round(Prediction, digits=2)) %>% 
+  mutate(Knowledge = "Knowledge")
+
+```
+
+#Plots for model predictions `Knowledge'
+
+```{r}
+####Graph Predictions:
+
+#set theme
+myTheme <-   theme(plot.title=element_text(size=18, 
+                                    face="bold", 
+                                    hjust=0.5,
+                                    lineheight=1.2),
+                   axis.title.x  = element_blank(), 
+                   axis.title.y = element_text(color="black", size = 18, vjust=.9), 
+                   axis.text.x = element_text(color="black", size = 14),
+                   axis.text.y = element_text(color="black", size = 18), 
+                   strip.text.x = element_text(color="black", size = 16),
+                   legend.text = element_text(color="black", size = 18),
+                   legend.title = element_text(color="black", size = 18),
+                   legend.position = "top",
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   strip.background = element_rect(fill="white"))
+
+#set colour palette 
+ecPalette<-c("gray13", "khaki4")
+
+#create plot
+FigXa <-df.Knowledge %>% 
+  mutate(Condition =factor(Condition,levels=c("Agent 1: normal", "Agent 2: abnormal"))) %>% 
+  ggplot(aes(x=factor(Condition), Prediction, fill=Condition)) +
+  geom_bar(stat="identity", position = "dodge", colour = "black", alpha=0.6)+
+  coord_cartesian(ylim = c(0,1.1)) +
+  geom_text(aes(label=scales::percent(Prediction, accuracy = 1)),  vjust=-0.6, color="black", size=6)+
+  labs( y="Probablity")+
+  scale_y_continuous(labels =scales::percent_format(accuracy = 1), breaks = seq(0, 1, by=0.25))+
+  scale_fill_manual(values = ePalette)+
+  facet_grid(~InferenceType)+
+  theme_bw()+
+  myTheme+
+  theme(legend.position= "none")+
+  labs(title="Knowledge")
+
+###show plot
+plot(FigXa)
+```
+
+###Bayesian Network Model
+# Version `No Knowledge' 
+```{r}
+# Version `No Knowledge' 
+
+#Graph Structure
+ dag2 = model2network("[NormalityA][NormalityB][AexpectsB][BexpectsA][MentalStateA][MentalStateB][ActionA|NormalityA:AexpectsB:MentalStateA][ActionB|NormalityB:BexpectsA:MentalStateB][Outcome|ActionA:ActionB]")
+
+#Variables
+
+NormalityA.lv = c("F", "T")
+NormalityB.lv = c("F", "T")
+AexpectsB.lv = c("F", "T")
+BexpectsA.lv = c("F", "T")
+MentalStateA.lv = c("F", "T")
+MentalStateB.lv = c("F", "T")
+ActionA.lv = c("F", "T")
+ActionB.lv = c("F", "T")
+Outcome.lv = c("F", "T")
+
+#Conditional  probabilities
+
+NormalityA.prob = array(c(0.2, 0.8), dim = 2, dimnames = list(NormalityA = NormalityA.lv))
+NormalityB.prob = array(c(0.2, 0.8), dim = 2, dimnames = list(NormalityB = NormalityB.lv))
+AexpectsB.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(AexpectsB = AexpectsB.lv)) #### independent node
+BexpectsA.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(BexpectsA = BexpectsA.lv)) #### independent node
+MentalStateA.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(MentalStateA = MentalStateA.lv))
+MentalStateB.prob = array(c(0.9, 0.1), dim = 2, dimnames = list(MentalStateB = MentalStateB.lv))
+ActionA.prob = array(c(0.8, 0.2, 0.9,0.1, 0.8, 0.2,0.1,0.9,0.2,0.8,0.9,0.1, 0.2, 0.8, 0.1,0.9), dim = c(2, 2, 2, 2), dimnames = list(ActionA=ActionA.lv, AexpectsB = AexpectsB.lv, MentalStateA = MentalStateA.lv, NormalityA = NormalityA.lv))
+ActionB.prob = array(c(0.8, 0.2, 0.9,0.1, 0.8, 0.2,0.1,0.9,0.2,0.8,0.9,0.1, 0.2, 0.8, 0.1,0.9), dim = c(2, 2, 2, 2), dimnames = list(ActionB=ActionB.lv, BexpectsA = BexpectsA.lv, MentalStateB = MentalStateB.lv, NormalityB = NormalityB.lv))
+Outcome.prob = array(c(1, 0, 1, 0, 1, 0, 0, 1), dim = c(2,2, 2), dimnames = list(Outcome = Outcome.lv, ActionA=ActionA.lv, ActionB=ActionB.lv))
+
+cpt2 = list(NormalityA = NormalityA.prob, 
+             NormalityB = NormalityB.prob,
+             AexpectsB = AexpectsB.prob,
+             BexpectsA = BexpectsA.prob,
+             MentalStateA=MentalStateA.prob,
+             MentalStateB=MentalStateB.prob,
+             ActionA=ActionA.prob,
+             ActionB=ActionB.prob,
+             Outcome=Outcome.prob)
+
+#Set up model
+survey2 = custom.fit(dag2, cpt2)
+
+# plot model
+graphviz.plot(dag2,shape = "ellipse")
+
+```
+
+#Estimation of Conditional Probablity for mental state
+
+```{r}
+#############Mental State
+##### Mental State for Abnormal Agent
+## mental state true
+M_Abnormal2<-cpquery(survey2, event = (MentalStateB == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") &(ActionB == "T") &(Outcome == "T"), n=10000000 )
+
+
+#### Mental State for Normal Agent
+## mental state true
+M_Normal2<-cpquery(survey2, event = (MentalStateA == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") , n=10000000 )
+```
+
+#Estimation of Conditional Probablity for epistemic state
+
+```{r}
+##### Epistemic State for Abnormal Agent
+## epistemic  state true
+E_Abnormal2<-cpquery(survey2, event = (BexpectsA == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") &(Outcome == "T"), n=10000000 )
+
+#### Epistemic State for Normal Agent
+## epistemic  state true
+E_Normal2<-cpquery(survey2, event = (AexpectsB == "T"), evidence = (NormalityA == "T") & 
+          (NormalityB == "F") & (ActionA == "T") & (ActionB == "T") , n=10000000 )
+```
+
+#create dataframe with cpqs
+
+```{r}
+
+df.NoKnowledge<-data.frame(Prediction=c(M_Abnormal2, M_Normal2, E_Abnormal2, E_Normal2), Condition=c("Agent 2: abnormal", "Agent 1: normal", "Agent 2: abnormal", "Agent 1: normal"), InferenceType=c("Mental State", "Mental State", "Expectation about other agent", "Expectation about other agent")) %>% 
+  mutate(Prediction = round(Prediction, digits=2)) %>% 
+  mutate(Knowledge="No Knowledge")
+
+```
+
+#Plot model predictions `No Knowledge'
+```{r}
+
+####Set theme
+myTheme <-   theme(plot.title=element_text(size=18, 
+                                    face="bold", 
+                                    hjust=0.5,
+                                    lineheight=1.2),
+                   axis.title.x  = element_blank(), 
+                   axis.title.y = element_text(color="black", size = 18, vjust=.9), 
+                   axis.text.x = element_text(color="black", size = 14),
+                   axis.text.y = element_text(color="black", size = 18), 
+                   strip.text.x = element_text(color="black", size = 16),
+                   legend.text = element_text(color="black", size = 18),
+                   legend.title = element_text(color="black", size = 18),
+                   legend.position = "top",
+                   panel.grid.major = element_blank(),
+                   panel.grid.minor = element_blank(),
+                   strip.background = element_rect(fill="white"))
+ 
+#set colour palette   
+ePalette<- c("#969696", "#f7f7f7")
+
+#create plot
+FigXb <- df.NoKnowledge %>% 
+  mutate(Condition =factor(Condition,levels=c("Agent 1: normal", "Agent 2: abnormal"))) %>% 
+  ggplot(aes(x=factor(Condition), Prediction, fill=Condition)) +
+  geom_bar(stat="identity", position = "dodge", colour = "black", alpha=0.6)+
+  coord_cartesian(ylim = c(0,1.1)) +
+  geom_text(aes(label=scales::percent(Prediction, accuracy = 1)), size=6, vjust=-0.6, color="black")+
+  labs( y="Probablity")+
+  scale_y_continuous(labels =scales::percent_format(accuracy = 1), breaks = seq(0, 1, by=0.25))+
+  scale_fill_manual(values = ePalette)+
+  facet_grid(~InferenceType)+
+  theme_bw()+
+  myTheme+
+  theme(legend.position= "none")+
+    labs(title="No Knowledge")
+
+
+###show plot
+plot(FigXb)
+```
+
+##create one plot wit predictions from 
+#`Knowledge' and `No Knowledge' version
+```{r}
+#create plot
+FigX <- ggarrange(FigXa, FigXb,
+                    ncol = 1, 
+                    nrow = 2)
+#show plot
+plot(FigX)
+
+#save plot
+ggsave(FigX, file="FigX.pdf", dpi=400, height = 8, width = 8)
+ggsave(FigX, file="FigX.jpeg", dpi=400, height = 8, width = 8)
+
+```
