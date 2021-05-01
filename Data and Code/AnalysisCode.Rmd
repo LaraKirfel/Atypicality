@@ -34,7 +34,7 @@ install.packages("pwr") ####?
 install.packages("simr")
 install.packages("Publish")
 install.packages("ggpubr")
-install.packages("ggtext")
+install.packages("emmeans")
 
 
 ```
@@ -52,7 +52,7 @@ library("MuMIn") # for calculating effect sizes
 library("pwr") #for power analysis 
 library("simr") # for power analysis 
 library("ggpubr") # for publication Ready Plots
-
+library("emmeans") # for post hoc tests
 ```
 
 ```{r}
@@ -256,20 +256,12 @@ anova(C1_m3,C1_m4)
 r.squaredGLMM(C1_m4)#effect size for full model
 summary(C1_m4)
 
+##Posthoc test
+C1_m4_posthoc <- emmeans(C1_m4, pairwise ~ agent|frequency)
+summary(C1_m4_posthoc)
+
 ##Three way interaction with scenario
 anova(C1_m4,C1_m5)
-
-##Test for agents in 'both frequent' condition
-C1_t1 <- lmer(cause_rating ~ (1|participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
-C1_t2 <- lmer(cause_rating ~ agent + (1 | participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
-anova(C1_t1,C1_t2)
-
-##Test for agents in 'one frequent' condition
-C1_t3 <- lmer(cause_rating ~ (1|participant), data=df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",])
-C1_t4 <- lmer(cause_rating ~ agent + (1|participant), df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",])
-anova(C1_t3,C1_t4)
-
-
 
 ###Overall analysis
 lmerTest::lmer(cause_rating ~ frequency*agent*scenario + (1 | participant), df.exp1_long)%>% summary()
@@ -289,14 +281,6 @@ fixef(C1_m4)["agentagent 2:frequencyBoth agents frequent"]
 
 #### Testing Interaction vs frequency only
 powerSim(C1_m4, nsim=100, test = fcompare(C1_m2))
-
-######Power Curve for Frequency x Agency Interaction
-SCurve1<-powerCurve(C1_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"),
-                    along = "participant",
-                    breaks = c(20,40,60,80),
-                    nsim=100,alpha=.045, progress=FALSE)
-plot(SCurve1)
-summary(SCurve1)
 
 ```
 
@@ -324,21 +308,15 @@ summary(E1_m3)
 ##Interaction of frequency and agent
 anova(E1_m3,E1_m4)
 r.squaredGLMM(E1_m4)#effect size for full model
+summary(E1_m4)
 
+##Posthoc test
+E1_m4_posthoc <- emmeans(E1_m4, pairwise ~ agent|frequency)
+summary(E1_m4_posthoc)
 
 ##Interaction scenario x frequency x agent
 anova(E1_m4,E1_m5)
 r.squaredGLMM(E1_m5)
-
-##Test for `agent' in 'both frequent' condition
-E1_t1 <- lmer(expect_rating ~ (1|participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
-E1_t2 <- lmer(expect_rating ~ agent + (1 | participant), df.exp1_long[df.exp1_long$frequency=="Both agents frequent",], REML=F)
-anova(E1_t1,E1_t2)
-
-##Test for `agent' in 'one frequent' condition
-E1_t3 <- lmer(expect_rating ~ (1|participant), data=df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",], REML=F)
-E1_t4 <- lmer(expect_rating ~ agent + (1|participant), df.exp1_long[df.exp1_long$frequency=="Agent 2 infrequent",], REML=F)
-anova(E1_t3,E1_t4)
 
 ##Test for scenario interaction with frequency for fixed agent (`normal agent')
 E1_t5 <- lmer(expect_rating ~ frequency+
@@ -350,6 +328,9 @@ E1_t6 <- lmer(expect_rating ~ frequency*scenario+
                df.exp1_long[df.exp1_long$agent=="agent 1",], REML=F)
 anova(E1_t5,E1_t6)
 
+##Posthoc tests
+E1_m5_posthoc <- emmeans(E1_m5, pairwise ~ agent*frequency|scenario)
+summary(E1_m5_posthoc)
 
 ###Overall analysis
 lmerTest::lmer(expect_rating ~ frequency*agent*scenario + (1 | participant), df.exp1_long)%>% summary()
@@ -370,13 +351,6 @@ fixef(E1_m4)["agentagent 2:frequencyBoth agents frequent"]
 #### Testing Interaction vs frequency only
 powerSim(E1_m4, nsim=100, test = fcompare(E1_m2))
 
-######Power Curve for Frequency x Agency Interaction
-SCurve1<-powerCurve(E1_m4, fixed("agentagent 2:frequencyBoth agents frequent", "z"),
-                    along = "participant",
-                    breaks = c(20,40,60,80),
-                    nsim=100,alpha=.045, progress=FALSE)
-plot(SCurve1)
-summary(SCurve1)
 
 ```
 
@@ -473,7 +447,7 @@ plot(Fig1a)
 
 
 # Save plot
-ggsave(Fig1a, file="Fig1a.pdf", dpi=400, height = 6, width = 8)
+ggsave(Fig1a, file="Fig1a.jpeg", dpi=400, height = 6, width = 8)
 
 ```
 
@@ -503,7 +477,7 @@ Fig1b <- ggplot(df.exp1_long, aes(x=factor(frequency, levels=level_order), expec
 plot(Fig1b)
 
 #Save plot
-ggsave(Fig1b, file="Fig1b.pdf", dpi=400, height = 6, width = 8)
+ggsave(Fig1b, file="Fig1b.jpeg", dpi=400, height = 6, width = 8)
 ```
 
 
@@ -750,14 +724,14 @@ anova(E2_m3,E2_m4)
 r.squaredGLMM(E2_m4)
 summary(E2_m4)
 
+##Posthoc tests
+E2_m4_posthoc <- emmeans(E2_m4, pairwise ~ agent|frequency)
+summary(E2_m4_posthoc)
+
+
 ##Three-way interaction frequency x agents x scenario
 anova(E2_m4,E2_m5)
 r.squaredGLMM(E2_m5)
-
-##Test for agents in 'one frequent' condition
-E2_t3 <- lmer(expect_rating ~ (1|participant), data=df.exp2_long[df.exp2_long$frequency=="Agent 2 infrequent",], REML=F)
-E2_t4 <- lmer(expect_rating ~ agent + (1|participant), df.exp2_long[df.exp2_long$frequency=="Agent 2 infrequent",], REML=F)
-anova(E2_t3,E2_t4)
 
 ##Test for scenario interaction with frequency for fixed agent
 E2_t5 <- lmer(expect_rating ~ 
@@ -882,7 +856,7 @@ Fig2a <- ggplot(df.exp2_long, aes(x=factor(frequency, levels=level_order), cause
 plot(Fig2a)
 
 #Save Plot
-ggsave(Fig2a, file="Fig2a.pdf", dpi=400, height = 6, width = 8)
+ggsave(Fig2a, file="Fig2a.jpeg", dpi=400, height = 6, width = 8)
 
 ```
 
@@ -911,7 +885,7 @@ Fig2b <- ggplot(df.exp2_long, aes(x=factor(frequency, levels=level_order), expec
 plot(Fig2b)
 
 #Save plot
-ggsave(Fig2b, file="Fig2b.pdf", dpi=400, height = 6, width = 8)
+ggsave(Fig2b, file="Fig2b.jpeg", dpi=400, height = 6, width = 8)
 ```
 
 
@@ -1103,22 +1077,15 @@ r.squaredGLMM(E3_m3)
 
 ##Interaction of knowledge and agent
 anova(E3_m3,E3_m4)
-summary(E3_m4)
+r.squaredGLMM(E3_m4)
+
+##Posthoc tests
+E3_m4_posthoc <- emmeans(E3_m4, pairwise ~ agent|knowledge)
+summary(E3_m4_posthoc)
+
 
 ##... interaction with scenario
 anova(E3_m5,E3_m4)
-r.squaredGLMM(E3_m4)
-
-
-##Test for agent in 'knowlege' condition
-E3_t3 <- lmer(expect_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
-E3_t4 <- lmer(expect_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
-anova(E3_t3,E3_t4)
-
-##Test for agent in 'no knowlege' condition
-E3_t5 <- lmer(expect_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
-E3_t6 <- lmer(expect_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
-anova(E3_t5,E3_t6)
 
  
 ###Primary analysis
@@ -1139,13 +1106,6 @@ fixef(E3_m4)["agentAgent 2: abnormal:knowledgeNo Knowledge"]
 #### Testing Interaction vs knowledge only
 powerSim(E3_m4, nsim=100, test = fcompare(E3_m2))
 
-######Power Curve for Normality x Knowledge Interaction
-SCurve1<-powerCurve(E3_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"),
-                    along = "participant",
-                    breaks = c(20,40,60,80),
-                    nsim=100,alpha=.045, progress=FALSE)
-plot(SCurve1)
-summary(SCurve1)
 
 ```
 
@@ -1168,21 +1128,16 @@ r.squaredGLMM(C3_m1)
 
 ##Effect of knowledge
 anova(C3_m1,C3_m3)
-r.squaredGLMM(C3_m3)
 
 ##Interaction of knowledge and agent
 anova(C3_m3,C3_m4)
 r.squaredGLMM(C3_m4)
 
-##Test for agent in 'knowlege' condition
-C3_t3 <- lmer(cause_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
-C3_t4 <- lmer(cause_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="Knowledge",], REML=F)
-anova(C3_t3,C3_t4)
 
-##Test for agent in 'no knowlege' condition
-C3_t5 <- lmer(cause_rating ~ (1|participant), data=df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
-C3_t6 <- lmer(cause_rating ~ agent + (1|participant), df.exp3_long[df.exp3_long$knowledge=="No Knowledge",], REML=F)
-anova(C3_t5,C3_t6)
+##Posthoc tests
+C3_m4_posthoc <- emmeans(C3_m4, pairwise ~ agent|knowledge)
+summary(C3_m4_posthoc)
+
 
 ##Three way interaction with scenario
 anova(C3_m4,C3_m5)
@@ -1206,14 +1161,6 @@ fixef(C3_m4)["agentAgent 2: abnormal:knowledgeNo Knowledge"]
 
 #### Testing Interaction vs Knowledge only
 powerSim(C3_m4, nsim=100, test = fcompare(C3_m2))
-
-######Power Curve for Normality x Agent Interaction
-SCurve1<-powerCurve(C3_m4, fixed("agentAgent 2: abnormal:knowledgeNo Knowledge", "z"),
-                    along = "participant",
-                    breaks = c(20,40,60,80),
-                    nsim=100,alpha=.045, progress=FALSE)
-plot(SCurve1)
-summary(SCurve1)
 
 ```
 
@@ -1351,7 +1298,7 @@ Fig3 <- ggarrange(Knowledge, NoKnowledge,
 plot(Fig3)
 
 ### save plot
-ggsave(Fig3, file="Fig3.pdf", dpi=400, height = 8, width = 8)
+ggsave(Fig3, file="Fig3.jpeg", dpi=400, height = 8, width = 8)
 
 ```
 
@@ -1655,7 +1602,6 @@ FigX <- ggarrange(FigXa, FigXb,
 plot(FigX)
 
 #save plot
-ggsave(FigX, file="FigX.pdf", dpi=400, height = 8, width = 8)
 ggsave(FigX, file="FigX.jpeg", dpi=400, height = 8, width = 8)
 
 ```
@@ -1920,18 +1866,13 @@ r.squaredGLMM(E4_m3)
 anova(E4_m3,E4_m4)
 r.squaredGLMM(E4_m4)
 
+##Posthoc tests
+E4_m4_posthoc <- emmeans(E4_m4, pairwise ~ agent|knowledge)
+summary(E4_m4_posthoc)
+
 ##Three way interaction scenario x knowledge x agent
 anova(E4_m4,E4_m5)
 
-#Test for agents in 'Knowledge' condition
-E4_t1 <- lmer(exp_other ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
-E4_t2 <- lmer(exp_other ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
-anova(E4_t1,E4_t2)
-
-#Test for agents in 'No Knowledge' condition
-E4_t3 <- lmer(exp_other ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
-E4_t4 <- lmer(exp_other ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
-anova(E4_t3,E4_t4)
 
 ###Overall analysis
 lmerTest::lmer(exp_other ~ agent*knowledge*scenario + (1 | participant), df.exp4_long)%>% summary()
@@ -1985,20 +1926,13 @@ r.squaredGLMM(Ex4_m3)
 anova(Ex4_m3,Ex4_m4)
 r.squaredGLMM(Ex4_m4)
 
+##Posthoc tests
+Ex4_m4_posthoc <- emmeans(Ex4_m4, pairwise ~ agent|knowledge)
+summary(Ex4_m4_posthoc)
+
 ##Three way interaction scenario x knowledge x agent
 anova(Ex4_m4,Ex4_m5)
 r.squaredGLMM(Ex4_m5)
-
-
-#Test for agents in 'Knowledge' condition
-Ex4_t1 <- lmer(exp_outcome ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
-Ex4_t2 <- lmer(exp_outcome ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
-anova(Ex4_t1,Ex4_t2)
-
-#Test for agents in 'No Knowledge' condition
-Ex4_t3 <- lmer(exp_outcome ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
-Ex4_t4 <- lmer(exp_outcome ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
-anova(Ex4_t3,Ex4_t4)
 
 
 ####Agent x Knowledge x Scenario Interaction Decomposition
@@ -2047,22 +1981,12 @@ r.squaredGLMM(M4_m3)
 anova(M4_m3,M4_m4)
 r.squaredGLMM(M4_m4)
 
+##Posthoc tests
+M4_m4_posthoc <- emmeans(M4_m4, pairwise ~ agent|knowledge)
+summary(M4_m4_posthoc)
+
 ##Three way interaction with scenario
 anova(M4_m5,M4_m4)
-
-#Test for agents in 'Knowledge' condition
-M4_t1 <- lmer(mental_state ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
-M4_t2 <- lmer(mental_state ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="Knowledge",], REML=F)
-anova(M4_t1,M4_t2)
-
-#Test for agents in 'No Knowledge' condition
-M4_t3 <- lmer(mental_state ~ (1|participant), data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
-M4_t4 <- lmer(mental_state ~ agent + (1|participant), df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], REML=F)
-anova(M4_t3,M4_t4)
-
-### T Test
-t.test(mental_state ~ agent, data=df.exp4_long[df.exp4_long$knowledge=="Knowledge",], paired = F)
-t.test(mental_state ~ agent, data=df.exp4_long[df.exp4_long$knowledge=="No Knowledge",], paired = F)
 
 
 ###Overall analysis
@@ -2149,7 +2073,7 @@ Fig4a <- df.exp4_long %>%
 plot(Fig4a)
 
 #save plot
-ggsave(Fig4a, file="Fig4a.pdf", dpi=400, height = 6, width = 9)
+ggsave(Fig4a, file="Fig4a.jpeg", dpi=400, height = 6, width = 9)
 
 
 
@@ -2186,7 +2110,7 @@ Fig4b <- df.exp4_long %>%
 plot(Fig4b)
 
 #save plot
-ggsave(Fig4b, file="Fig4b.pdf", dpi=400, height = 9, width = 9)
+ggsave(Fig4b, file="Fig4b.jpeg", dpi=400, height = 9, width = 9)
 
 ```
 
